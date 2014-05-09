@@ -114,7 +114,7 @@ class Tx_Aloha_Hooks_ContentPostProc {
 			</script>
 			';
 		$styles .= '
-			<script type="text/javascript" src="typo3conf/ext/aloha/Resources/Public/js/viewpage.js"></script>';
+			<script type="text/javascript" src="/typo3conf/ext/aloha/Resources/Public/js/viewpage.js"></script>';
 
 			// Wrap it all in a comment for infos when looking at sources
 		$styles = LF . '<!-- Begin Aloha Files -->' . LF . $styles . LF . '<!-- End Aloha Files -->' . LF . LF;
@@ -171,7 +171,7 @@ class Tx_Aloha_Hooks_ContentPostProc {
 			//  If mod.web_list.newContentWiz.overrideWithExtension is set, use that extension's create new content wizard instead:
 		$tsConfig = BackendUtility::getModTSconfig($this->pageinfo['uid'], 'mod.web_list');
 		$tsConfig = $tsConfig['properties']['newContentWiz.']['overrideWithExtension'];
-		$newContentWizScriptPath = ExtensionManagementUtility::isLoaded($tsConfig) ? (ExtensionManagementUtility::extRelPath($tsConfig) . 'mod1/db_new_content_el.php') : (TYPO3_mainDir . 'sysext/cms/layout/db_new_content_el.php');
+		$newContentWizScriptPath = ExtensionManagementUtility::isLoaded($tsConfig) ? (ExtensionManagementUtility::extRelPath($tsConfig) . 'mod1/db_new_content_el.php') : ('/' . TYPO3_mainDir . 'sysext/cms/layout/db_new_content_el.php');
 
 
 		$id = $GLOBALS['TSFE']->id;
@@ -179,7 +179,7 @@ class Tx_Aloha_Hooks_ContentPostProc {
 			// Edit page properties
 		if (($perms & 2) && (!$this->settings['topBar.']['pageButtons.']['edit.']['disable'])) {
 			$params = '&edit[pages][' . $GLOBALS['TSFE']->id . ']=edit&noView=1';
-			$url = TYPO3_mainDir . 'alt_doc.php?' . $params . $this->getReturnUrl();
+			$url = '/' . TYPO3_mainDir . 'alt_doc.php?' . $params . $this->getReturnUrl();
 
 			$content .= '<a onclick="' . $this->lightboxUrl($url) . '" href="' . htmlspecialchars($url) . '">
 						<img ' . $this->getIcon('edit_page.gif') . ' title="' . $this->sL('LLL:EXT:cms/layout/locallang.xml:editPageProperties') . '" alt="" />
@@ -187,7 +187,7 @@ class Tx_Aloha_Hooks_ContentPostProc {
 
 			if (isset($this->tslib_fe->page['_PAGES_OVERLAY']) && isset($this->tslib_fe->page['_PAGES_OVERLAY_UID']) && $langAllowed) {
 				$params = '&edit[pages_language_overlay][' . $this->tslib_fe->page['_PAGES_OVERLAY_UID'] . ']=edit&noView=1';
-				$url = TYPO3_mainDir . 'alt_doc.php?' . $params . $this->getReturnUrl();
+				$url = '/' . TYPO3_mainDir . 'alt_doc.php?' . $params . $this->getReturnUrl();
 
 				$content .= '<a rel="shadowbox" href="' . htmlspecialchars($url) . '">
 						<img ' . $this->getIcon('edit.gif') . '  title="' . $this->sL('LLL:EXT:cms/layout/locallang.xml:editPageProperties') . '- overlay' . '" alt="" /></a>
@@ -199,7 +199,7 @@ class Tx_Aloha_Hooks_ContentPostProc {
 			// @todo: add some permissions for that
 		if (TRUE && (!$this->settings['topBar.']['pageButtons.']['history.']['disable'])) {
 				// Record history
-			$url = TYPO3_mainDir . 'show_rechis.php?element=' . rawurlencode('pages:' . $id) . $this->getReturnUrl();
+			$url = '/' . TYPO3_mainDir . 'show_rechis.php?element=' . rawurlencode('pages:' . $id) . $this->getReturnUrl();
 
 			$content .= '<a onclick="' . $this->lightboxUrl($url) . '" href="' . htmlspecialchars($url) . '">
 					<img ' . $this->getIcon('history2.gif') .
@@ -220,7 +220,7 @@ class Tx_Aloha_Hooks_ContentPostProc {
 
 			// Move
 		if (($perms & 2) && (!$this->settings['topBar.']['pageButtons.']['move.']['disable'])) {
-			$url = TYPO3_mainDir . 'move_el.php?table=pages&uid=' . $GLOBALS['TSFE']->id . $this->getReturnUrl();
+			$url = '/' . TYPO3_mainDir . 'move_el.php?table=pages&uid=' . $GLOBALS['TSFE']->id . $this->getReturnUrl();
 
 			$content .= '<a onclick="' . $this->lightboxUrl($url) . '" href="' . htmlspecialchars($url) . '">
 					<img ' . $this->getIcon('move_page.gif') . ' title="' . $this->sL('LLL:EXT:cms/layout/locallang.xml:move_page') . '" alt="" /></a>';
@@ -228,7 +228,7 @@ class Tx_Aloha_Hooks_ContentPostProc {
 
 			// New Page
 		if (($perms & 8) && (!$this->settings['topBar.']['pageButtons.']['newPage.']['disable'])) {
-			$url = TYPO3_mainDir . 'db_new.php?id=' . $id . '&pagesOnly=1' . $this->getReturnUrl();
+			$url = '/' . TYPO3_mainDir . 'db_new.php?id=' . $id . '&pagesOnly=1' . $this->getReturnUrl();
 			$content .= '<a onclick="' . $this->lightboxUrl($url) . '" href="' . htmlspecialchars($url) . '">
 					<img ' . $this->getIcon('new_page.gif') . ' title="' . $this->sL('LLL:EXT:cms/layout/locallang.xml:newPage') . '" alt="" /></a>';
 		}

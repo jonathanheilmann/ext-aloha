@@ -1,0 +1,61 @@
+<?xml version="1.0" encoding="utf-8" standalone="yes" ?>
+<T3locallang>
+	<meta type="array">
+		<type>module</type>
+		<description>Language labels for extension &quot;aloha&quot;</description>
+	</meta>
+	<data type="array">
+		<languageKey index="default" type="array">
+			<label index="extmng.headerTemplate">Define header template:Set path to a file whose content is loaded in the header and defines who Aloha editing looks like.</label>
+			<label index="extmng.saveMethode">
+				Define the save method:There are different ways how content is saved into the database.
+				None: Nothing will be saved into the datbase. Use this for demonstrations.
+				Direct: Ever change will be directly saved into the database.
+				Intermediate: Changes will be saved when pressing the save button.
+			</label>
+			<label index="extmng.saveMethode.none">None</label>
+			<label index="extmng.saveMethode.direct">Direct</label>
+			<label index="extmng.saveMethode.intermediate">Intermediate</label>
+
+			<label index="constants.disablePageButtons">Page Buttons Settings</label>
+			<label index="constants.topBar.pageButtons.edit.disable">Disable Page Edit Button</label>
+			<label index="constants.topBar.pageButtons.history.disable">Disable Page History Button</label>
+			<label index="constants.topBar.pageButtons.newContentElement.disable">Disable New Content Element Button</label>
+			<label index="constants.topBar.pageButtons.move.disable">Disable Move Page Button</label>
+			<label index="constants.topBar.pageButtons.newPage.disable">Disable New Page Button</label>
+
+			<label index="aloha">Aloha Editor</label>
+			<label index="response.action.save">Changes have been saved!</label>
+			<label index="response.action.unhide">The record has been unhidden, reload to see the result.</label>
+			<label index="response.action.hide">The record has been hidden, reload to see the result.</label>
+			<label index="response.action.delete">The record has been deleted, reload to see the result.</label>
+			<label index="response.action.moveUp">The record has been moved up, reload to see the result.</label>
+			<label index="response.action.moveDown">The record has been moved down, reload to see the result.</label>
+			<label index="error.response-action">Response action "%s" not supported!</label>
+			<label index="error.move-action.wrong-direction">The direction "%s" is not supported for moving the record.</label>
+			<label index="error.request.no-post">No post request found. This is needed to save anything.</label>
+			<label index="error.request.not-allowed">No BE-USER found or aloha editor not enabled.</label>
+			<label index="error.request.itentifier">Something wrong with the identifiers, no action can follow.</label>
+			<label index="error.request.table">No table found</label>
+			<label index="error.request.field">No field found</label>
+			<label index="error.request.uid">No valid uid found</label>
+			<label index="error.request.save">Saving could not be processed.</label>
+			<label index="error.integration.table">No table found.</label>
+			<label index="error.integration.id">No id found.</label>
+			<label index="error.integration.field">No field given which is needed to know where to save content in.</label>
+			<label index="error.saveMethod">No save method defined!</label>
+			<label index="admPanel.title">Aloha Editor</label>
+			<label index="admPanel.enable">Enable</label>
+			<label index="admPanel.error_title">To enable Aloha:</label>
+			<label index="admPanel.error_userTsConfig">Enable Aloha in UserTsConfig with 'aloha = 1'!</label>
+			<label index="admPanel.error_typoScript">Enable Aloha in TypoScript with 'config.aloha = 1'!</label>
+
+			<label index="headerbar.count">There are %s elements to be saved.</label>
+			<label index="headerbar.save_button">Save</label>
+			<label index="headerbar.discard_button">Discard</label>
+			<label index="headerbar.welcome">Welcome %s!</label>
+			<label index="headerbar.saveMethod.none">&lt;strong&gt;Demo mode:&lt;/strong&gt; Changes are not saved to the database!</label>
+			<label index="headerbar.saveMethod.direct">&lt;strong&gt;Be aware:&lt;/strong&gt; Changes are directly saved to the database!</label>
+		</languageKey>
+	</data>
+</T3locallang>

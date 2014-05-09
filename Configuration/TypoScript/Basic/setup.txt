@@ -1,0 +1,23 @@
+[globalVar = TSFE : beUserLogin > 0]
+
+	# Additional page plugin for save requests as those need a BE-USER
+	aloha = PAGE
+	aloha{
+		typeNum = 661
+
+		config {
+			disableAllHeaderCode = 1
+			xhtml_cleaning = none
+			admPanel = 0
+			metaCharset = utf-8
+			no_cache = 1
+		}
+
+		includeLibs.aloha = EXT:aloha/Classes/Aloha/Save.php
+		10 = USER
+		10 {
+			userFunc = Tx_Aloha_Aloha_Save->start
+		}
+	}
+
+[global]

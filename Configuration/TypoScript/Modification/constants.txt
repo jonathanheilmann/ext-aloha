@@ -1,0 +1,15 @@
+# customsubcategory=disablePageButtons=LLL:EXT:aloha/Resources/Private/Language/locallang.xml:constants.disablePageButtons
+tx_aloha.config {
+	disablePageButtons {
+		# cat=plugin.tx_aloha/disablePageButtons/aa; type=boolean; label=LLL:EXT:aloha/Resources/Private/Language/locallang.xml:constants.topBar.pageButtons.edit.disable
+		edit =
+		# cat=plugin.tx_aloha/disablePageButtons/ab; type=boolean; label=LLL:EXT:aloha/Resources/Private/Language/locallang.xml:constants.topBar.pageButtons.history.disable
+		history =
+		# cat=plugin.tx_aloha/disablePageButtons/ac; type=boolean; label=LLL:EXT:aloha/Resources/Private/Language/locallang.xml:constants.topBar.pageButtons.newContentElement.disable
+		newContentElement =
+		# cat=plugin.tx_aloha/disablePageButtons/ad; type=boolean; label=LLL:EXT:aloha/Resources/Private/Language/locallang.xml:constants.topBar.pageButtons.move.disable
+		move = 
+		# cat=plugin.tx_aloha/disablePageButtons/ae; type=boolean; label=LLL:EXT:aloha/Resources/Private/Language/locallang.xml:constants.topBar.pageButtons.newPage.disable
+		newPage = 
+	}
+}

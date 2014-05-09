@@ -1,0 +1,84 @@
+config.tx_aloha {
+	topBar {
+		disable = 0
+		warningMessage.disable = 1
+		pageButtons {
+			edit.disable = {$tx_aloha.config.disablePageButtons.edit}
+			history.disable = {$tx_aloha.config.disablePageButtons.history}
+			newContentElement.disable = {$tx_aloha.config.disablePageButtons.newContentElement}
+			move.disable = {$tx_aloha.config.disablePageButtons.move}
+			newPage.disable = {$tx_aloha.config.disablePageButtons.newPage}
+		}
+	}
+	responsiveView {
+		buttons {
+			desktop.disable = 0
+			laptop.disable = 0
+			tablet.disable = 0
+			mobile {
+				disable = 0
+				// You can use this to set width interval for given view
+				#minWidth = 340px
+				#maxWidth = 340px
+			}
+		}
+	}
+}
+
+[globalVar = GP:aloha_topBar_disable = 1]
+	config.tx_aloha.topBar.disable = 1
+[global]
+
+# Remove header link
+lib.stdheader.10.setCurrent.typolink >
+
+#header
+lib.stdheader.10.1.stdWrapProcess = Tx_Aloha_hooks_editicons->render
+lib.stdheader.10.1.alohaProcess = 1
+lib.stdheader.10.1.alohaProcess {
+	tag = div
+	field = header
+	allow = edit
+	class = heading nostyles
+}
+lib.stdheader.10.2.stdWrapProcess < lib.stdheader.10.1.stdWrapProcess
+lib.stdheader.10.3.stdWrapProcess < lib.stdheader.10.1.stdWrapProcess
+lib.stdheader.10.4.stdWrapProcess < lib.stdheader.10.1.stdWrapProcess
+lib.stdheader.10.5.stdWrapProcess < lib.stdheader.10.1.stdWrapProcess
+lib.stdheader.10.2.alohaProcess < lib.stdheader.10.1.alohaProcess
+lib.stdheader.10.3.alohaProcess < lib.stdheader.10.1.alohaProcess
+lib.stdheader.10.4.alohaProcess < lib.stdheader.10.1.alohaProcess
+lib.stdheader.10.5.alohaProcess < lib.stdheader.10.1.alohaProcess
+
+lib.stdheader.default.stdWrap.editIcons.beforeLastTag = -1
+
+
+lib.stdheader.default.10.2.aloha < lib.stdheader.default.10.1.aloha
+
+
+tt_content.text.20.editIcons.beforeLastTag = 0
+tt_content.text.20.alohaProcess = 1
+tt_content.text.20.alohaProcess {
+	class = alohaeditable-block
+	field = bodytext
+	allow = all
+}
+
+
+# content element "bullets"
+tt_content.bullets.20.editIcons >
+tt_content.bullets.20.alohaPostProcess = 1
+tt_content.bullets.20.alohaPostProcess {
+	class = alohaeditable-block
+	field = bodytext
+	allow = all
+}
+
+# content element "table"
+tt_content.table.20.stdWrap.editIcons >
+tt_content.table.20.stdWrap.alohaPostProcess = 1
+tt_content.table.20.stdWrap.alohaPostProcess {
+	class = alohaeditable-block
+	field = bodytext
+	allow = all
+}

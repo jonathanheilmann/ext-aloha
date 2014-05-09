@@ -62,7 +62,7 @@ class Tx_Aloha_Aloha_Save {
 		$this->tce = GeneralUtility::makeInstance('TYPO3\\CMS\\Core\\DataHandling\\DataHandler');
 		$this->tce->stripslashes_values = 0;
 
-		$this->t3lib_frontendedit = \TYPO3\CMS\Documentation\Utility\GeneralUtility::makeInstance('TYPO3\\CMS\\Core\\FrontendEditing\\FrontendEditingController');
+		$this->t3lib_frontendedit = GeneralUtility::makeInstance('TYPO3\\CMS\\Core\\FrontendEditing\\FrontendEditingController');
 
 		$configurationArray = unserialize($GLOBALS['TYPO3_CONF_VARS']['EXT']['extConf']['aloha']);
 		$this->saveMethod = $configurationArray['saveMethod'];
@@ -74,7 +74,7 @@ class Tx_Aloha_Aloha_Save {
 	 *
 	 * @param string $content
 	 * @param array $conf plugin configuration
-	 * @return sring
+	 * @return string
 	 */
 	public function start($content, $conf) {
 		$request = GeneralUtility::_POST();
@@ -169,7 +169,7 @@ class Tx_Aloha_Aloha_Save {
 		$countOfElements = Tx_Aloha_Utility_Integration::getCountOfUnsavedElements($GLOBALS['TSFE']->id);
 
 		$response = 'Press Save button for a real save. <script>
-window.alohaQuery("#count").text("' . $test. $countOfElements . '").' . ($countOfElements > 0 ? 'add' : 'remove') . 'Class("tobesaved");
+window.alohaQuery("#count").text("' . $countOfElements . '").' . ($countOfElements > 0 ? 'add' : 'remove') . 'Class("tobesaved");
 window.alohaQuery("#aloha-saveButton").show();
 </script>';
 		return $response;

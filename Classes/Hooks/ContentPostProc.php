@@ -315,8 +315,7 @@ class Tx_Aloha_Hooks_ContentPostProc {
 	 * @todo do it correctly
 	 */
 	public function getIcon($icon) {
-		return IconUtility::skinImg(TYPO3_mainDir, 'sysext/t3skin/icons/gfx/' . $icon, 'width="16" height="16"');
-		return IconUtility::skinImg(TYPO3_mainDir, 'gfx/' . $icon, 'width="11" height="12"');
+		return IconUtility::skinImg('/' . TYPO3_mainDir, 'sysext/t3skin/icons/gfx/' . $icon, 'width="16" height="16"');
 	}
 
 	/**

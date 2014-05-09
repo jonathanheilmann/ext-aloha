@@ -28,6 +28,11 @@ body {
 	z-index: 10999;
 }
 
+#aloha-top-bar * {
+    box-sizing: content-box;
+    -webkit-box-sizing: content-box;
+}
+
 #aloha-topbar-inner {
 	padding:1px 10px 1px 0;
 	height: 30px;

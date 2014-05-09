@@ -33,7 +33,7 @@
  * @package TYPO3
  * @subpackage tx_aloha
  */
-class Tx_Aloha_ViewHelpers_EditableViewHelper extends Tx_Fluid_Core_ViewHelper_AbstractViewHelper {
+class Tx_Aloha_ViewHelpers_EditableViewHelper extends \TYPO3\CMS\Fluid\Core\ViewHelper\AbstractViewHelper {
 
 	/**
 	 * Render aloha integration for a single field
@@ -69,7 +69,7 @@ class Tx_Aloha_ViewHelpers_EditableViewHelper extends Tx_Fluid_Core_ViewHelper_A
 				// @todo maybe a caching is good
 			$record = $GLOBALS['TYPO3_DB']->exec_SELECTgetSingleRow('*', $table, 'uid=' . (int)$uid);
 
-			$cObj = t3lib_div::makeInstance('tslib_cObj');
+			$cObj = \TYPO3\CMS\Core\Utility\GeneralUtility::makeInstance('TYPO3\\CMS\\Frontend\\ContentObject\\ContentObjectRenderer');
 			$cObj->start($record, $table);
 
 			$content = $cObj->stdWrap($content, $finalConfiguration);

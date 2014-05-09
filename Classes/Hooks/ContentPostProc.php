@@ -1,5 +1,10 @@
 <?php
 
+use TYPO3\CMS\Backend\Utility\BackendUtility;
+use TYPO3\CMS\Backend\Utility\IconUtility;
+use TYPO3\CMS\Core\Utility\ExtensionManagementUtility;
+use TYPO3\CMS\Core\Utility\GeneralUtility;
+
 class Tx_Aloha_Hooks_ContentPostProc {
 	const ll = 'LLL:EXT:aloha/Resources/Private/Language/locallang.xml:';
 
@@ -30,10 +35,10 @@ class Tx_Aloha_Hooks_ContentPostProc {
 	 * Hook to change page output to add the topbar
 	 *
 	 * @param array $params
-	 * @param tslib_fe $parentObject
+	 * @param \TYPO3\CMS\Frontend\Controller\TypoScriptFrontendController $parentObject
 	 * @return void
 	 */
-	public function main(array $params, tslib_fe $parentObject) {
+	public function main(array $params, \TYPO3\CMS\Frontend\Controller\TypoScriptFrontendController $parentObject) {
 		if (Tx_Aloha_Utility_Access::isEnabled() && $parentObject->type == 0) {
 //		if (TRUE && isset($GLOBALS['BE_USER']) && $parentObject->type == 0) {
 			$this->tslib_fe = $parentObject;
@@ -63,7 +68,7 @@ class Tx_Aloha_Hooks_ContentPostProc {
 			if (is_array($GLOBALS['TYPO3_CONF_VARS']['Aloha']['Classes/Aloha/Integration.php']['toolbarPostProcess'])) {
 				$finished = FALSE;
 				foreach ($GLOBALS['TYPO3_CONF_VARS']['Aloha']['Classes/Aloha/Integration.php']['toolbarPostProcess'] as $classData) {
-					$hookObject = t3lib_div::getUserObj($classData);
+					$hookObject = GeneralUtility::getUserObj($classData);
 					if (!($hookObject instanceof Tx_Aloha_Interfaces_ToolbarPostProcess)) {
 						throw new UnexpectedValueException(
 							$classData . ' must implement interface Tx_Aloha_Interfaces_ToolbarPostProcess',
@@ -86,14 +91,14 @@ class Tx_Aloha_Hooks_ContentPostProc {
 	private function loadHeader() {
 			// Needed variables for ajax requests
 		$styles = '<script type="text/javascript">' . LF .
-			TAB . 'var alohaUrl = "' . t3lib_div::getIndpEnv('TYPO3_SITE_URL') . 'index.php?id=' . $this->tslib_fe->id . '&type=661' . '";' . LF .
-			TAB . 'var typo3BackendUrl = "' . t3lib_div::getIndpEnv('TYPO3_SITE_URL') . TYPO3_mainDir . '";' . LF .
+			TAB . 'var alohaUrl = "' . GeneralUtility::getIndpEnv('TYPO3_SITE_URL') . 'index.php?id=' . $this->tslib_fe->id . '&type=661' . '";' . LF .
+			TAB . 'var typo3BackendUrl = "' . GeneralUtility::getIndpEnv('TYPO3_SITE_URL') . TYPO3_mainDir . '";' . LF .
 			'</script>' . LF;
 
 			// Load template from given path (set in EM settings)
 		$configurationArray = unserialize($GLOBALS['TYPO3_CONF_VARS']['EXT']['extConf']['aloha']);
 		if (is_array($configurationArray) && !empty($configurationArray['headerTemplate'])) {
-			$styles .= t3lib_div::getUrl($configurationArray['headerTemplate']);
+			$styles .= GeneralUtility::getUrl($configurationArray['headerTemplate']);
 		}
 
 		$styles .= '
@@ -164,9 +169,9 @@ class Tx_Aloha_Hooks_ContentPostProc {
 		$langAllowed = $GLOBALS['BE_USER']->checkLanguageAccess($GLOBALS['TSFE']->sys_language_uid);
 
 			//  If mod.web_list.newContentWiz.overrideWithExtension is set, use that extension's create new content wizard instead:
-		$tsConfig = t3lib_BEfunc::getModTSconfig($this->pageinfo['uid'], 'mod.web_list');
+		$tsConfig = BackendUtility::getModTSconfig($this->pageinfo['uid'], 'mod.web_list');
 		$tsConfig = $tsConfig['properties']['newContentWiz.']['overrideWithExtension'];
-		$newContentWizScriptPath = t3lib_extMgm::isLoaded($tsConfig) ? (t3lib_extMgm::extRelPath($tsConfig) . 'mod1/db_new_content_el.php') : (TYPO3_mainDir . 'sysext/cms/layout/db_new_content_el.php');
+		$newContentWizScriptPath = ExtensionManagementUtility::isLoaded($tsConfig) ? (ExtensionManagementUtility::extRelPath($tsConfig) . 'mod1/db_new_content_el.php') : (TYPO3_mainDir . 'sysext/cms/layout/db_new_content_el.php');
 
 
 		$id = $GLOBALS['TSFE']->id;
@@ -276,11 +281,11 @@ class Tx_Aloha_Hooks_ContentPostProc {
 		$content = '';
 
 		//Logout
-		$logoutUrl = t3lib_div::getIndpEnv('TYPO3_SITE_URL') . TYPO3_mainDir . 'logout.php?redirect=' . rawurlencode(t3lib_div::getIndpEnv('TYPO3_REQUEST_URL'));
+		$logoutUrl = GeneralUtility::getIndpEnv('TYPO3_SITE_URL') . TYPO3_mainDir . 'logout.php?redirect=' . rawurlencode(GeneralUtility::getIndpEnv('TYPO3_REQUEST_URL'));
 		$content .= '<a href="' . htmlspecialchars($logoutUrl) . '" class="btn btn-danger"><i class="icon-off"></i></a>';
 
 		//Open Backend
-		$backendUrl = t3lib_div::getIndpEnv('TYPO3_SITE_URL') . TYPO3_mainDir;
+		$backendUrl = GeneralUtility::getIndpEnv('TYPO3_SITE_URL') . TYPO3_mainDir;
 		$content .= '<a target="_top" href="' . htmlspecialchars($backendUrl) . '" class="btn btn-success">' . $this->sL('LLL:EXT:lang/locallang_login.xml:interface.backend') . '</a>';
 
 		if(!empty($content)) {
@@ -310,8 +315,8 @@ class Tx_Aloha_Hooks_ContentPostProc {
 	 * @todo do it correctly
 	 */
 	public function getIcon($icon) {
-		return t3lib_iconWorks::skinImg(TYPO3_mainDir, 'sysext/t3skin/icons/gfx/' . $icon, 'width="16" height="16"');
-		return t3lib_iconWorks::skinImg(TYPO3_mainDir, 'gfx/' . $icon, 'width="11" height="12"');
+		return IconUtility::skinImg(TYPO3_mainDir, 'sysext/t3skin/icons/gfx/' . $icon, 'width="16" height="16"');
+		return IconUtility::skinImg(TYPO3_mainDir, 'gfx/' . $icon, 'width="11" height="12"');
 	}
 
 	/**
@@ -323,7 +328,7 @@ class Tx_Aloha_Hooks_ContentPostProc {
 	public function sL($key, $hsc = TRUE) {
 			// it can happen that this is null, no wonder why
 		if (is_null($GLOBALS['LANG'])) {
-			$GLOBALS['LANG'] = t3lib_div::makeInstance('language');
+			$GLOBALS['LANG'] = GeneralUtility::makeInstance('language');
 			$GLOBALS['LANG']->init($GLOBALS['BE_USER']->uc['lang']);
 		}
 		return $GLOBALS['LANG']->sL($key, $hsc);

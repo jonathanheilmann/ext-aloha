@@ -22,6 +22,7 @@
  *
  *  This copyright notice MUST APPEAR in all copies of the script!
  * ************************************************************* */
+use TYPO3\CMS\Backend\Utility\BackendUtility;
 
 /**
  * Check access of the user to display only those actions which are allowed
@@ -92,16 +93,16 @@ class Tx_Aloha_Utility_Integration {
 	 * @return string
 	 */
 	public static function rteModification($table, $field, $id, $pageId, $fieldContent) {
-		t3lib_div::loadTCA($table);
+		\TYPO3\CMS\Core\Utility\GeneralUtility::loadTCA($table);
 		$fieldConfig = $GLOBALS['TCA'][$table]['columns'][$field]['config']['wizards'];
 		if (isset($fieldConfig['RTE'])) {
 			$currentRecord = self::recordInfo($table, $id);
 
-			$RTEsetup = $GLOBALS['BE_USER']->getTSConfig('RTE', t3lib_BEfunc::getPagesTSconfig($pageId));
+			$RTEsetup = $GLOBALS['BE_USER']->getTSConfig('RTE', BackendUtility::getPagesTSconfig($pageId));
 
-			$theTypeString = t3lib_BEfunc::getTCAtypeValue($table, $currentRecord);
+			$theTypeString = BackendUtility::getTCAtypeValue($table, $currentRecord);
 
-			$types_fieldConfig2 = t3lib_BEfunc::getTCAtypes($table, $currentRecord);
+			$types_fieldConfig2 = BackendUtility::getTCAtypes($table, $currentRecord);
 			$vconf = Array();
 			foreach ($types_fieldConfig2 as $config) {
 				if ($config['field'] == $field) {
@@ -109,13 +110,13 @@ class Tx_Aloha_Utility_Integration {
 				}
 			}
 
-			$RTEsetup = $GLOBALS['BE_USER']->getTSConfig('RTE', t3lib_BEfunc::getPagesTSconfig($pageId));
-			$thisConfig = t3lib_BEfunc::RTEsetup($RTEsetup['properties'], $table, $vconf['field'], $theTypeString);
+			$RTEsetup = $GLOBALS['BE_USER']->getTSConfig('RTE', BackendUtility::getPagesTSconfig($pageId));
+			$thisConfig = BackendUtility::RTEsetup($RTEsetup['properties'], $table, $vconf['field'], $theTypeString);
 
 				// @todo check that
 			$RTErelPath = is_array($eFile) ? dirname($eFile['relEditFile']) : '';
 
-			$RTEobj = t3lib_BEfunc::RTEgetObj();
+			$RTEobj = BackendUtility::RTEgetObj();
 			if (is_object($RTEobj)) {
 				$fieldContent = $RTEobj->transformContent('db', $fieldContent, $table, $vconf['field'], $currentRecord, $vconf['spec'], $thisConfig, $RTErelPath, $currentRecord['pid']);
 			} else {

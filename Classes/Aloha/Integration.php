@@ -22,6 +22,7 @@
  *
  *  This copyright notice MUST APPEAR in all copies of the script!
  * ************************************************************* */
+use TYPO3\CMS\Core\Utility\GeneralUtility;
 
 /**
  * Integration class of aloha into TYPO3
@@ -37,7 +38,7 @@ class Tx_Aloha_Aloha_Integration {
 	protected $dataArray = array();
 	protected $alohaConfig = array();
 
-	public function start($content, array $configuration, tslib_cObj &$parentObject) {
+	public function start($content, array $configuration, \TYPO3\CMS\Frontend\ContentObject\ContentObjectRenderer &$parentObject) {
 		try {
 			$alohaConfig = $configuration;
 			$this->init($parentObject, $alohaConfig);
@@ -78,7 +79,7 @@ class Tx_Aloha_Aloha_Integration {
 	 * @return void
 	 */
 	private function getAllowedActions(array $alohaConfig, array &$classList) {
-		$allowedActions = array_flip(t3lib_div::trimExplode(',', $alohaConfig['allow']));
+		$allowedActions = array_flip(GeneralUtility::trimExplode(',', $alohaConfig['allow']));
 
 			// Hiding in workspaces because implementation is incomplete
 			// @todo: check that
@@ -131,12 +132,12 @@ class Tx_Aloha_Aloha_Integration {
 	/**
 	 * Initialize the integration to get needed configs
 	 *
-	 * @param tslib_cObj $parentObject
+	 * @param \TYPO3\CMS\Frontend\ContentObject\ContentObjectRenderer $parentObject
 	 * @param array $alohaConfig
 	 * @return void
 	 */
-	private function init(tslib_cObj $parentObject, array $alohaConfig) {
-		list($table, $id) = t3lib_div::trimExplode(':', $parentObject->currentRecord);
+	private function init(\TYPO3\CMS\Frontend\ContentObject\ContentObjectRenderer $parentObject, array $alohaConfig) {
+		list($table, $id) = GeneralUtility::trimExplode(':', $parentObject->currentRecord);
 		$currentRecord = $parentObject->data;
 
 		if(isset($currentRecord['_LOCALIZED_UID']))	{

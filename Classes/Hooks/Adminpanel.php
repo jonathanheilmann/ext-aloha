@@ -1,9 +1,5 @@
 <?php
 
-if(t3lib_utility_VersionNumber::convertVersionNumberToInteger(TYPO3_version) < t3lib_utility_VersionNumber::convertVersionNumberToInteger('4.6.0')) {
-	require_once(t3lib_extMgm::extPath('aloha') . 'Classes/Interfaces/interface.tslib_adminPanelHook.php');
-}
-
 /**
  * Hook to enable additional stdWrap function "aloha"
  *

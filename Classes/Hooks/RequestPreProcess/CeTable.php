@@ -23,7 +23,7 @@
  *  This copyright notice MUST APPEAR in all copies of the script!
  * ************************************************************* */
 
-require_once(t3lib_extMgm::extPath('aloha') . 'Classes/Interfaces/RequestPreProcess.php');
+require_once(\TYPO3\CMS\Core\Utility\ExtensionManagementUtility::extPath('aloha') . 'Classes/Interfaces/RequestPreProcess.php');
 
 /**
  * Hook for saving content element "table"
@@ -83,7 +83,7 @@ class Tx_Aloha_Hooks_RequestPreProcess_CeTable implements Tx_Aloha_Interfaces_Re
 			}
 //echo $captionValue;
 
-			$flexformTableSettings = t3lib_div::xml2array($record['pi_flexform']);
+			$flexformTableSettings = \TYPO3\CMS\Core\Utility\GeneralUtility::xml2array($record['pi_flexform']);
 
 
 

@@ -69,7 +69,7 @@ class Tx_Aloha_Hooks_Adminpanel implements tslib_adminPanelHook {
 				$innerContent .= $GLOBALS['LANG']->sL(self::ll . 'admPanel.enable', TRUE) .
 									'<input type="hidden" name="TSFE_ADMIN_PANEL[aloha]" value="0" />
 									<input id="enablealohaeditor" type="checkbox" name="TSFE_ADMIN_PANEL[aloha]" value="1"' . $enabled . ' />
-									<input class="typo3-adminPanel-update" style="float:none;" type="submit" value="' . $this->tslib_AdminPanel->extGetLL('update') . '" />';
+									<input class="typo3-adminPanel-update" style="float:none;" type="submit" value="' . $GLOBALS['LANG']->getLL('update') . '" />';
 			}
 
 				// Put all together

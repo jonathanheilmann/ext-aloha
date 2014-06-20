@@ -43,6 +43,12 @@ class BrowseLinks extends \TYPO3\CMS\Recordlist\Controller\ElementBrowserControl
 	 * @return void
 	 * @todo Define visibility
 	 */
+	public function __construct(){
+$this->init();
+$this->main();
+$this->addJsWrap();
+$this->printContent();
+}
 	public function main() {
 		// Clear temporary DB mounts
 		$tmpMount = \TYPO3\CMS\Core\Utility\GeneralUtility::_GET('setTempDBmount');
@@ -98,7 +104,7 @@ class BrowseLinks extends \TYPO3\CMS\Recordlist\Controller\ElementBrowserControl
 			list($modData, $store) = $this->browser->processSessionData($modData);
 			$GLOBALS['BE_USER']->pushModuleData('browse_links.php', $modData);
 			// Disable removeLink
-			$this->content = $this->browser->main_rte(1);
+			$this->content = $this->browser->main_rte(0);
 		}
 	}
 	/**
@@ -128,10 +134,10 @@ class BrowseLinks extends \TYPO3\CMS\Recordlist\Controller\ElementBrowserControl
 }
 
 // Make instance:
-$SOBE = \TYPO3\CMS\Core\Utility\GeneralUtility::makeInstance('BrowseLinks');
-$SOBE->init();
-$SOBE->main();
-$SOBE->addJsWrap();
-$SOBE->printContent();
+#global $TYPO3_CONF_VARS;
+TYPO3\CMS\Core\Utility\GeneralUtility::makeInstance('BrowseLinks',$TYPO3_CONF_VARS);
+#$SOBE->main();
+#$SOBE->addJsWrap();
+#$SOBE->printContent();
 
 ?>

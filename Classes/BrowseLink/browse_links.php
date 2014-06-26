@@ -71,17 +71,6 @@ $this->printContent();
 			$GLOBALS['BE_USER']->groupData['webmounts'] = implode(',', array_unique(\TYPO3\CMS\Core\Utility\GeneralUtility::intExplode(',', $altMountPoints)));
 			$GLOBALS['WEBMOUNTS'] = $GLOBALS['BE_USER']->returnWebmounts();
 		}
-		// Setting additional read-only browsing file mounts
-		// @todo: add this feature for FAL and TYPO3 6.0
-		$altMountPoints = trim($GLOBALS['BE_USER']->getTSConfigVal('options.folderTree.altElementBrowserMountPoints'));
-		if ($altMountPoints) {
-			$altMountPoints = \TYPO3\CMS\Core\Utility\GeneralUtility::trimExplode(',', $altMountPoints);
-			foreach ($altMountPoints as $filePathRelativeToFileadmindir) {
-				$GLOBALS['BE_USER']->addFileMount('', $filePathRelativeToFileadmindir, $filePathRelativeToFileadmindir, 1, 'readonly');
-			}
-			$GLOBALS['BE_USER']->getFileStorages();
-			$GLOBALS['FILEMOUNTS'] = $GLOBALS['BE_USER']->groupData['filemounts'];
-		}
 		// Render type by user func
 		$browserRendered = FALSE;
 		if (is_array($GLOBALS['TYPO3_CONF_VARS']['SC_OPTIONS']['typo3/browse_links.php']['browserRendering'])) {

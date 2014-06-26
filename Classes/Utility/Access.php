@@ -94,39 +94,35 @@ class Tx_Aloha_Utility_Access {
 	 * @return	boolean
 	 */
 	protected function allowedToEdit($table, array $dataArray, array $conf, $checkEditAccessInternals = TRUE) {
-			// Unless permissions specifically allow it, editing is not allowed.
+		// Unless permissions specifically allow it, editing is not allowed.
 		$mayEdit = FALSE;
 
+		// Basic check if use is allowed to edit a record of this kind (based on TCA configuration)
 		if ($checkEditAccessInternals) {
 			$editAccessInternals = $GLOBALS['BE_USER']->recordEditAccessInternals($table, $dataArray, FALSE, FALSE);
 		} else {
 			$editAccessInternals = TRUE;
 		}
 
-
-
-
 		if ($editAccessInternals) {
 			if ($table === 'pages') {
-					// 2 = permission to edit the page
+				// 2 = permission to edit the page
 				if ($GLOBALS['BE_USER']->isAdmin() || $GLOBALS['BE_USER']->doesUserHaveAccess($dataArray, 2)) {
 					$mayEdit = TRUE;
 				}
 			} elseif ($table === 'tt_content') {
-					// 16 = permission to edit content on the page
+				// 16 = permission to edit content on the page
 				if ($GLOBALS['BE_USER']->isAdmin() || $GLOBALS['BE_USER']->doesUserHaveAccess(\TYPO3\CMS\Backend\Utility\BackendUtility::getRecord('pages', $dataArray['pid']), 16)) {
 					$mayEdit = TRUE;
 				}
 			} else {
+				// neither page nor content
 				$mayEdit = TRUE;
 			}
 
-
-
-
 			if (!$conf['onlyCurrentPid'] || ($dataArray['pid'] == $GLOBALS['TSFE']->id)) {
 
-					// Permissions:
+				// Permissions:
 				$types = GeneralUtility::trimExplode(',', GeneralUtility::strtolower($conf['allow']), 1);
 				$allow = array_flip($types);
 
@@ -135,28 +131,27 @@ class Tx_Aloha_Utility_Access {
 				if ($table === 'pages') {
 					$allow = $this->getAllowedEditActions($table, $conf, $dataArray['pid'], $allow);
 
-						// Can only display editbox if there are options in the menu
+					// Can only display editbox if there are options in the menu
 					if (count($allow)) {
 						$mayEdit = TRUE;
 					}
 				} else {
 
-					#	if ($table != 'tt_content') {
-						#	t3lib_div::print_array($allow);
-					#	}
-
 					if ($table === 'tt_content') {
-						$mayEdit = count($allow) && ($perms & 1);
+						// user may edit the content if he has an allowed edit action and if the permission for the content is odd and not 1
+						// explanation of permissions: show=1,edit=2,delete=4,new=8,editcontent=16
+						// assuming that show must be set to have content editable, each permission is odd, but show itself isn't sufficient
+						$mayEdit = count($allow) && ($perms & 1 && $perms !== 1) ? TRUE : FALSE;
 					} else {
-							$mayEdit = ($perms & 1);
+						// user may edit if he has an allowed edit action and if the permission for the content is odd and not 1
+						// explanation of permissions: show=1,edit=2,delete=4,new=8,editcontent=16
+						// assuming that show must be set to have content editable, each permission is odd, but show itself isn't sufficient
+						$mayEdit = ($perms & 1 && $perms !== 1);
 					}
-
-
 
 				}
 			}
 		}
-
 		return $mayEdit;
 	}
 

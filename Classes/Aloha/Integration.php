@@ -42,7 +42,6 @@ class Tx_Aloha_Aloha_Integration {
 		try {
 			$alohaConfig = $configuration;
 			$this->init($parentObject, $alohaConfig);
-
 			$access = Tx_Aloha_Utility_Access::checkAccess($this->table, $this->dataArray, $this->alohaConfig);
 			if ($access) {
 				if (empty($content)) {

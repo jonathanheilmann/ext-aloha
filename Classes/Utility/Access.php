@@ -46,10 +46,16 @@ class Tx_Aloha_Utility_Access {
 				) {
 			// Defaultly allow aloha, only disable if user sets so
 			if (!isset($GLOBALS['BE_USER']->uc['TSFE_adminConfig']['aloha'])) {
-				return TRUE;
+				// Check if Aloha is enabled in the UserConfiguration
+				if (!empty($GLOBALS['BE_USER']->uc['aloha_enableFrontendEditing']) && (int)$GLOBALS['BE_USER']->uc['aloha_enableFrontendEditing'] === 1) {
+					return TRUE;
+				}
 			} else {
 				if ($GLOBALS['BE_USER']->uc['TSFE_adminConfig']['aloha'] == 1) {
-					return TRUE;
+					// Check if Aloha is enabled in the UserConfiguration
+					if (!empty($GLOBALS['BE_USER']->uc['aloha_enableFrontendEditing']) && (int)$GLOBALS['BE_USER']->uc['aloha_enableFrontendEditing'] === 1) {
+						return TRUE;
+					}
 				} else {
 					return FALSE;
 				}

@@ -17,6 +17,8 @@
 			<label index="extmng.saveMethode.direct">Direct</label>
 			<label index="extmng.saveMethode.intermediate">Intermediate</label>
 
+            <label index="userConfiguration.enableFrontendEditing">Enable Frontend Editing</label>
+
 			<label index="constants.disablePageButtons">Page Buttons Settings</label>
 			<label index="constants.topBar.pageButtons.edit.disable">Disable Page Edit Button</label>
 			<label index="constants.topBar.pageButtons.history.disable">Disable Page History Button</label>

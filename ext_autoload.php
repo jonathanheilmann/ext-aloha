@@ -15,6 +15,7 @@ return array(
 	'tx_aloha_hooks_requestpreprocess_cebullets' => $extensionClassesPath . 'Hooks/RequestPreProcess/CeBullets.php',
 	'tx_aloha_hooks_requestpreprocess_cetable' => $extensionClassesPath . 'Hooks/RequestPreProcess/CeTable.php',
 	'tx_aloha_hooks_requestpreprocess_cleanup' => $extensionClassesPath . 'Hooks/RequestPreProcess/Cleanup.php',
+	'tx_aloha_hooks_requestpreprocess_newsdatetime' => $extensionClassesPath . 'Hooks/RequestPreProcess/NewsDatetime.php',
 	'tx_aloha_interfaces_requestpreprocess' => $extensionClassesPath . 'Interfaces/RequestPreProcess.php',
 	'tx_aloha_interfaces_toolbarpostprocess' => $extensionClassesPath . 'Interfaces/ToolbarPostProcess.php',
 	'tx_aloha_utility_access' => $extensionClassesPath . 'Utility/Access.php',

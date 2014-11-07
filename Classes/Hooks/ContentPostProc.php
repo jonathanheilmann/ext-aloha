@@ -39,7 +39,7 @@ class Tx_Aloha_Hooks_ContentPostProc {
 	 * @return void
 	 */
 	public function main(array $params, \TYPO3\CMS\Frontend\Controller\TypoScriptFrontendController $parentObject) {
-		if (Tx_Aloha_Utility_Access::isEnabled() && $parentObject->type == 0) {
+		if (tx_aloha_utility_access::isEnabled() && $parentObject->type == 0) {
 //		if (TRUE && isset($GLOBALS['BE_USER']) && $parentObject->type == 0) {
 			$this->tslib_fe = $parentObject;
 
@@ -272,7 +272,7 @@ class Tx_Aloha_Hooks_ContentPostProc {
 	}
 
 	/**
-	 * 
+	 *
 	 * @return string
 	 * @todo make items configurable by TsConfig
 	 */

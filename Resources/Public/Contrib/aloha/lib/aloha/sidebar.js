@@ -45,7 +45,6 @@ define([
 	var uid = +(new Date());
 
 	// Extend jQuery easing animations.
-	//debugger;
 	if (!$.easing.easeOutExpo) {
 		$.extend($.easing, {
 			easeOutExpo: function (x, t, b, c, d) {
@@ -104,7 +103,7 @@ define([
 			// ugliness.  Our solution is to fallback to swapping icon images.
 			// We set this as a sidebar property so that it can overridden by
 			// whoever thinks they are smarter than we are.
-			rotateIcons: !$.browser.msie,
+			rotateIcons: !Aloha.browser.msie,
 			overlayPage: true
 		};
 

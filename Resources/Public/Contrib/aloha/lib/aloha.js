@@ -358,10 +358,6 @@
 			baseUrl: Aloha.settings.baseUrl,
 			map: moduleMap
 		};
-		
-		var DependencyManagement = global.__DEPS__ || (global.__DEPS__ = {});
-		
-		DependencyManagement.lang = defaultConfig.locale;
 
 		var defaultPaths = {
 			jquery: 'vendor/jquery-1.7.2',
@@ -374,7 +370,7 @@
 			RepositoryBrowser: 'vendor/repository-browser/js/repository-browser-unminified',
 			jstree: 'vendor/jquery.jstree',              // Mutates jquery
 			jqgrid: 'vendor/jquery.jqgrid',              // Mutates jquery
-			'jquery-layout': 'vendor/jquery.layout-1.3.0-rc30.7',     // Mutates jquery
+			'jquery-layout': 'vendor/jquery.layout-1.3.0-rc29.14',     // Mutates jquery
 			'jqgrid-locale-en': 'vendor/grid.locale.en', // Mutates jqgrid
 			'jqgrid-locale-de': 'vendor/grid.locale.de', // Mutates jqgrid
 			'repository-browser-i18n-de': 'vendor/repository-browser/js/repository-browser-unminified',
@@ -568,6 +564,12 @@
 	} // end load()
 
 	global.Aloha = global.Aloha || {};
+	global.Aloha.settings = global.Aloha.settings || {};
+
+	// set the locale in the global __DEPS__ here to enable i18n of dependencies
+	// like repository browser
+	global.__DEPS__ = global.__DEPS__ || {};
+	global.__DEPS__.lang = global.Aloha.settings.locale || 'en';
 	if (global.Aloha.deferInit || isDeferInit()) {
 		global.Aloha.deferInit = load;
 	} else {

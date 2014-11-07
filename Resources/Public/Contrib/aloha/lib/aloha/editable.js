@@ -1,33 +1,15 @@
-/* editable.js is part of Aloha Editor project http://aloha-editor.org
+/* editable.js is part of the Aloha Editor project http://aloha-editor.org
  *
  * Aloha Editor is a WYSIWYG HTML5 inline editing library and editor.
- * Copyright (c) 2010-2012 Gentics Software GmbH, Vienna, Austria.
+ * Copyright (c) 2010-2014 Gentics Software GmbH, Vienna, Austria.
  * Contributors http://aloha-editor.org/contribution.php
- *
- * Aloha Editor is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or any later version.
- *
- * Aloha Editor is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
- *
- * As an additional permission to the GNU GPL version 2, you may distribute
- * non-source (e.g., minimized or compacted) forms of the Aloha-Editor
- * source code without the copy of the GNU GPL normally required,
- * provided you include this license notice and a URL through which
- * recipients can access the Corresponding Source.
+ * License http://aloha-editor.org/license.php
  */
 define([
 	'aloha/core',
 	'util/class',
 	'jquery',
+	'aloha/content-rules',
 	'aloha/pluginmanager',
 	'aloha/selection',
 	'aloha/markup',
@@ -36,16 +18,15 @@ define([
 	'aloha/block-jump',
 	'aloha/ephemera',
 	'util/dom2',
-	'util/html',
 	'PubSub',
 	'aloha/copypaste',
 	'aloha/command',
-	'aloha/engine',
 	'aloha/state-override'
 ], function (
 	Aloha,
 	Class,
 	$,
+	ContentRules,
 	PluginManager,
 	Selection,
 	Markup,
@@ -54,11 +35,9 @@ define([
 	BlockJump,
 	Ephemera,
 	Dom,
-	Html,
 	PubSub,
 	CopyPaste,
 	Command,
-	Engine,
 	StateOverride
 ) {
 	'use strict';
@@ -171,40 +150,66 @@ define([
 		}
 	}
 
-	$(document).keydown(onKeydown);
-
 	/**
-	 * When selecting some content and pressing backspace or delete, the
-	 * delete is handled by engine.js which provides a correct
-	 * cross-browser implementation. When selecting some content and
-	 * pressing a non-control key (not backspace or delete), the
-	 * selected text must be deleted before inserting the character
-	 * corresponding to the key. The latter must also be handled by
-	 * engine.js.
+	 * Registers events on the given editable's corresponding DOM element.
+	 *
+	 * @param {Editable} editable
 	 */
-	function keypressDeleteHandler(event) {
-		if (event.altKey || event.ctrlKey || event.metaKey || !event.which) {
-			return;
-		}
-		var selection = Aloha.getSelection();
-		if (!selection.getRangeCount()) {
-			return;
-		}
-		var range = selection.getRangeAt(0);
-		if (range.collapsed) {
-			return;
-		}
-		var chr = String.fromCharCode(event.which);
-		if (Html.isControlCharacter(chr)) {
-			return;
-		}
-		Aloha.trigger('aloha-command-will-execute', {commandId: 'delete'});
-		// Because that is what the inserttext does, we call
-		// deleteContents directly with stripWrappers false instead of
-		// commands.delete.
-		Engine.deleteContents(range, {stripWrappers: false});
-		Aloha.trigger('aloha-command-executed', 'delete');
+	function registerEvents(editable) {
+		var $editable = editable.obj;
+
+		$editable.mousedown(function (event) {
+			if (!Aloha.eventHandled) {
+				Aloha.eventHandled = true;
+				if (Aloha.activeEditable == null || typeof Aloha.activeEditable === 'undefined' || $editable[0] !== Aloha.activeEditable.obj[0]) {
+					Aloha.mouseEventChangedEditable = true;
+				}
+				return editable.activate(event);
+			}
+		});
+		$editable.mouseup(function (event) {
+			Aloha.eventHandled = false;
+		});
+
+		$editable.focus(function (event) {
+			return editable.activate(event);
+		});
+
+		$editable.keydown(function (event) {
+			var letEventPass = Markup.preProcessKeyStrokes(event);
+			editable.keyCode = event.which;
+			if (!letEventPass) {
+				// the event will not proceed to key press, therefore trigger
+				// smartContentChange
+				editable.smartContentChange(event);
+			}
+			return letEventPass;
+		});
+
+		$editable.keypress(StateOverride.keyPressHandler);
+		$editable.keypress(function (event) {
+			// triggers a smartContentChange to get the right charcode
+			// To test try http://www.w3.org/2002/09/tests/keys.html
+			Aloha.activeEditable.smartContentChange(event);
+		});
+
+		$editable.keyup(function (event) {
+			if (event.keyCode === 27) {
+				Aloha.deactivateEditable();
+				return false;
+			}
+		});
+
+		$editable.contentEditableSelectionChange(function (event) {
+			Selection.onChange($editable, event, 0, Aloha.mouseEventChangedEditable);
+			if (Aloha.mouseEventChangedEditable) {
+				Aloha.mouseEventChangedEditable = false;
+			}
+			return $editable;
+		});
 	}
+
+	$(document).keydown(onKeydown);
 
 	/**
 	 * Editable object
@@ -331,63 +336,14 @@ define([
 				contenthandler: Aloha.settings.contentHandler.initEditable,
 				command: 'initEditable'
 			}, me);
-			me.obj.html(content);
+			me.obj.html(ContentRules.applyRules(content, me.obj[0]));
 
 			// Because editables can only properly be initialized when Aloha
 			// plugins are loaded.
 			Aloha.bind('aloha-plugins-loaded', function () {
 				me.obj.addClass('aloha-editable').contentEditable(true);
 
-				me.obj.mousedown(function (e) {
-					if (!Aloha.eventHandled) {
-						Aloha.eventHandled = true;
-						return me.activate(e);
-					}
-				});
-
-				me.obj.mouseup(function (e) {
-					Aloha.eventHandled = false;
-				});
-
-				me.obj.focus(function (e) {
-					return me.activate(e);
-				});
-
-				var keyInputElements = me.obj.add('.aloha-block', me.obj)
-					.keydown(function (event) {
-						var letEventPass = Markup.preProcessKeyStrokes(event);
-						me.keyCode = event.which;
-
-						if (!letEventPass) {
-							// the event will not proceed to key press, therefore trigger smartContentChange
-							me.smartContentChange(event);
-						}
-						return letEventPass;
-					})
-					.keypress(keypressDeleteHandler)
-					.keypress(StateOverride.keyPressHandler)
-					.keydown(StateOverride.keyDownHandler);
-
-				// handle keypress
-				me.obj.keypress(function (event) {
-					// triggers a smartContentChange to get the right charcode
-					// To test try http://www.w3.org/2002/09/tests/keys.html
-					Aloha.activeEditable.smartContentChange(event);
-				});
-
-				// handle shortcut keys
-				me.obj.keyup(function (event) {
-					if (event.keyCode === 27) {
-						Aloha.deactivateEditable();
-						return false;
-					}
-				});
-
-				// register the onSelectionChange Event with the Editable field
-				me.obj.contentEditableSelectionChange(function (event) {
-					Selection.onChange(me.obj, event);
-					return me.obj;
-				});
+				registerEvents(me);
 
 				// mark the editable as unmodified
 				me.setUnmodified();
@@ -406,10 +362,6 @@ define([
 
 				me.snapshotContent = me.getContents();
 
-				// FF bug: check for empty editable contents ( no <br>; no whitespace )
-				if (jQuery.browser.mozilla) {
-					me.initEmptyEditable();
-				}
 
 				me.initPlaceholder();
 
@@ -431,7 +383,10 @@ define([
 				 * @param {Array} a an array which contains a reference to the currently created editable on its first position
 				 */
 				Aloha.trigger('aloha-editable-created', [me]);
-				PubSub.pub('aloha.editable.created', {data: me});
+				PubSub.pub('aloha.editable.created', {
+					editable: me,
+					data: me // deprecated
+				});
 			});
 		},
 
@@ -549,19 +504,6 @@ define([
 		},
 
 		/**
-		 * Check if the editable div is not empty. Fixes a FF browser bug
-		 * see issue: https://github.com/alohaeditor/Aloha-Editor/issues/269
-		 *
-		 * @return {undefined}
-		 */
-		initEmptyEditable: function () {
-			var obj = this.obj;
-			if (this.empty(this.getContents())) {
-				jQuery(obj).prepend('<br class="aloha-cleanme" />');
-			}
-		},
-
-		/**
 		 * Add placeholder in editable
 		 *
 		 * @return void
@@ -675,7 +617,10 @@ define([
 			 * @param {Array} a an array which contains a reference to the currently created editable on its first position
 			 */
 			Aloha.trigger('aloha-editable-destroyed', [this]);
-			PubSub.pub('aloha.editable.destroyed', {data: this});
+			PubSub.pub('aloha.editable.destroyed', {
+				editable: this,
+				data: this // deprecated
+			});
 
 			// finally register the editable with Aloha
 			Aloha.unregisterEditable(this);
@@ -787,6 +732,9 @@ define([
 				'editable': this
 			});
 			PubSub.pub('aloha.editable.activated', {
+				old: oldActive,
+				editable: this,
+				// deprecated
 				data: {
 					old: oldActive,
 					editable: this
@@ -812,10 +760,10 @@ define([
 			 * @param {Event} e the event object
 			 * @param {Array} a an array which contains a reference to this editable
 			 */
-			Aloha.trigger('aloha-editable-deactivated', {
-				editable: this
-			});
+			Aloha.trigger('aloha-editable-deactivated', {editable: this});
 			PubSub.pub('aloha.editable.deactivated', {
+				editable: this,
+				// deprecated
 				data: {
 					editable: this
 				}
@@ -1078,4 +1026,7 @@ define([
 	Aloha.Editable.getContentSerializer = function () {
 		return contentSerializer;
 	};
+
+	Aloha.Editable.registerEvents = registerEvents;
+
 });

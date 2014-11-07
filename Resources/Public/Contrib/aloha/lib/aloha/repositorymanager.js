@@ -27,19 +27,47 @@
 define([
 	'jquery',
 	'util/class',
-	'util/arrays',
 	'aloha/core',
 	'aloha/console',
 	'aloha/repositoryobjects' // Provides Aloha.RepositoryFolder
 ], function (
 	$,
 	Class,
-	Arrays,
 	Aloha,
 	Console,
 	__unused__
 ) {
 	'use strict';
+
+	/**
+	 * Given an input set, returns a new set which is a range of the input set
+	 * that maps to the given predicate.
+	 *
+	 * Prefers native Array.prototype.filter() where available (after JavaScript
+	 * 1.6).
+	 *
+	 * @param {function:boolean} predicate
+	 * @return {Array} Sub set of domain
+	 */
+	var filter = (function (predicate) {
+		if (predicate) {
+			return function (domain, predicate) {
+				return domain.filter(predicate);
+			};
+		}
+
+		return function (domain, predicate) {
+			var codomain = [],
+				i,
+				len = domain.length;
+			for (i = 0; i < len; i++) {
+				if (predicate(domain[i])) {
+					codomain.push(domain[i]);
+				}
+			}
+			return codomain;
+		};
+	}(Array.prototype.hasOwnProperty('filter')));
 
 	/**
 	 * Bundles results, and meta information in preparation for the JSON Reader.
@@ -384,7 +412,7 @@ define([
 			                 ? [manager.getRepository(params.repositoryId)]
 			                 : manager.repositories;
 
-			var queue = Arrays.filter(repositories, repositoryFilters.query);
+			var queue = filter(repositories, repositoryFilters.query);
 
 			// If none of the repositories implemented the query method, then
 			// don't wait for the timeout, simply report to the client.
@@ -483,7 +511,7 @@ define([
 			                 : manager.repositories;
 
 			if (params.repositoryFilter && params.repositoryFilter.length) {
-				repositories = Arrays.filter(repositories, function (repository) {
+				repositories = filter(repositories, function (repository) {
 					return -1 < $.inArray(repository.repositoryId,
 						params.repositoryFilter);
 				});
@@ -510,7 +538,7 @@ define([
 				return;
 			}
 
-			var queue = Arrays.filter(repositories, repositoryFilters.getChildren);
+			var queue = filter(repositories, repositoryFilters.getChildren);
 
 			if (0 === queue.length) {
 				clearTimeout(timer);
@@ -576,24 +604,28 @@ define([
 				return;
 			}
 
-			var manager = this;
+			var manager = this, $obj = $(obj);
 
 			if (item) {
 				var repository = manager.getRepository(item.repositoryId);
 				if (repository) {
-					$(obj).attr({
-						'data-gentics-aloha-repository': item.repositoryId,
-						'data-gentics-aloha-object-id': item.id
-					});
-					repository.markObject(obj, item);
+					// only mark the object if something changed
+					if ($obj.attr('data-gentics-aloha-repository') !== item.repositoryId ||
+							$obj.attr('data-gentics-aloha-object-id') !== item.id) {
+						$obj.attr({
+							'data-gentics-aloha-repository': item.repositoryId,
+							'data-gentics-aloha-object-id': item.id
+						});
+						repository.markObject(obj, item);
+					}
 				} else {
 					Console.error(manager, 'Trying to apply a repository "'
 							+ item.name
 							+ '" to an object, but item has no repositoryId.');
 				}
 			} else {
-				$(obj).removeAttr('data-gentics-aloha-repository')
-				      .removeAttr('data-gentics-aloha-object-id');
+				$obj.removeAttr('data-gentics-aloha-repository')
+				    .removeAttr('data-gentics-aloha-object-id');
 			}
 		},
 
@@ -685,7 +717,7 @@ define([
 		 * @return {Folder} Selected folder or null if it cannot be found.
 		 */
 		getSelectedFolder: function () {
-			var repositories = Arrays.filter(this.repositories,
+			var repositories = filter(this.repositories,
 					repositoryFilters.getSelectedFolder);
 			var i;
 			var selected;

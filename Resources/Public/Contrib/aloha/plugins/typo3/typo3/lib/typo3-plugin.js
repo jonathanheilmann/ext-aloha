@@ -100,7 +100,7 @@ function(
 			var url = typo3BackendUrl + '../typo3conf/ext/aloha/Classes/BrowseLink/browse_links.php?mode=rte&act=page',
 				range = Aloha.Selection.getRangeObject(),
 				link = this.findLinkMarkup( range );
-			
+
 			// If link exists sent curUrl
 			if ( link ) {
 				var additionalParameter = '&curUrl[href]=' + encodeURIComponent(link.getAttribute('href'));
@@ -126,9 +126,17 @@ function(
 			    buildLink,
 			    linkText,
 			    newLink;
-			
+
 			if ( !( range.startContainer && range.endContainer ) ) {
 				return;
+			}
+
+			// check if it is a header -> set range to whole header-text
+			var activeEditable = Aloha.getActiveEditable().obj[0];
+			var id = jQuery(activeEditable).attr('id');
+			var infos = id.split('--');
+			if (infos[0] == 'tt_content' && infos[1] == 'header') {
+				range = this.selectDomNode( jQuery(activeEditable).get(0) );
 			}
 
 			if ( link ) {
@@ -167,6 +175,35 @@ function(
 		},
 
 		/**
+		 *
+		 */
+		removeTypolink: function ( terminateLinkScope ) {
+			var that = this,
+			    range = Aloha.Selection.getRangeObject(),
+			    foundMarkup = that.findLinkMarkup();
+
+			if ( !( range.startContainer && range.endContainer ) ) {
+				return;
+			}
+
+			if ( foundMarkup ) {
+				// remove the link
+				GENTICS.Utils.Dom.removeFromDOM( foundMarkup, range, true );
+
+				range.startContainer = range.endContainer;
+				range.startOffset = range.endOffset;
+
+				// select the (possibly modified) range
+				range.select();
+
+				if ( typeof terminateLinkScope == 'undefined' ||
+				              terminateLinkScope === true ) {
+				      Scopes.setScope('Aloha.continuoustext');
+				}
+			}
+		},
+
+		/**
 		 * Check whether inside a link tag
 		 * @param {GENTICS.Utils.RangeObject} range range where to insert the
 		 *			object (at start or end)
@@ -177,6 +214,7 @@ function(
 			if ( typeof range == 'undefined' ) {
 				range = Aloha.Selection.getRangeObject();
 			}
+
 			if ( Aloha.activeEditable ) {
 				// If the anchor element itself is the editable, we
 				// still want to show the link tab.
@@ -190,6 +228,21 @@ function(
 			} else {
 				return null;
 			}
+		},
+
+		/**
+		 * Select a DOM node
+		 * will create a new range which spans the provided dom node and selects it afterwards
+		 * @param domObject DOM object
+		 * @method
+		 */
+		selectDomNode: function (domObject) {
+			var newRange = new GENTICS.Utils.RangeObject();
+			newRange.startContainer = newRange.endContainer = domObject.parentNode;
+			newRange.startOffset = GENTICS.Utils.Dom.getIndexInParent(domObject);
+			newRange.endOffset = newRange.startOffset + 1;
+			newRange.select();
+			return newRange;
 		},
 
 		/**
@@ -222,6 +275,13 @@ function(
 				'aloha-typolink-created',
 				function (jEvent, args) {
 					that.insertTypolink(args['link']);
+				}
+			);
+
+			Aloha.bind(
+				'aloha-typolink-removed',
+				function (jEvent, args) {
+					that.removeTypolink(args);
 				}
 			);
 		},

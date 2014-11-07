@@ -246,11 +246,30 @@ define(['util/functions'], function (Fn) {
 	}
 
 	/**
+	 * Returns concatenation of two arrays.
+	 * @param {Array} xs
+	 * @param {Array} zx
+	 * @returns {Array}
+	 */
+	function concat(xs, zx) {
+		return xs.concat(zx);
+	}
+
+	/**
 	 * Returns all items in xs that are also contained in zs.
 	 */
 	function intersect(xs, zs) {
 		return filter(xs, function (x) {
 			return contains(zs, x);
+		});
+	}
+
+	/**
+	 * Returns all items in xs that are not contained in zs.
+	 */
+	function subtract(xs, zs) {
+		return filter(xs, function (x) {
+			return !contains(zs, x);
 		});
 	}
 
@@ -268,6 +287,32 @@ define(['util/functions'], function (Fn) {
 		return xs[1];
 	}
 
+	/**
+	 * Coerces the given object (NodeList, arguments) to an array.
+	 * @param  {*} list
+	 * @return {Array}
+	 */
+	function coerce(list) {
+		var i;
+		var len;
+		var resultArray = [];
+
+		for (i = 0, len = list.length; i < len; i++) {
+			resultArray.push(list[i]);
+		}
+
+		return resultArray;
+	}
+
+	/**
+	 * Checks if `array` is empty.
+	 * @param {Array.<*>} array
+	 * @return {boolean}
+	 */
+	function isEmpty(array) {
+		return array.length === 0;
+	}
+
 	return {
 		filter: filter,
 		indexOf: indexOf,
@@ -281,7 +326,11 @@ define(['util/functions'], function (Fn) {
 		applyNotNull: applyNotNull,
 		sortUnique: sortUnique,
 		intersect: intersect,
+		subtract: subtract,
 		second: second,
-		last: last
+		last: last,
+		coerce: coerce,
+		isEmpty: isEmpty,
+		concat: concat
 	};
 });

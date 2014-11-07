@@ -71,6 +71,7 @@ define([
 	'util/maps',
 	'util/dom2',
 	'util/functions',
+	'util/html',
 	'util/misc',
 	'util/browser',
 	'PubSub'
@@ -84,6 +85,7 @@ define([
 	Maps,
 	Dom,
 	Functions,
+	Html,
 	Misc,
 	Browser,
 	PubSub
@@ -96,7 +98,6 @@ define([
 			'aloha-ephemera-filler': true,
 			'aloha-ephemera-attr': true,
 			'aloha-ephemera': true,
-			'aloha-anchor-first': true,
 			// aloha-cleanme is the same as aloha-ephemera.
 			// TODO: should be replaced with aloha-ephemera throughout
 			//       the codebase and removed here.
@@ -227,10 +228,10 @@ define([
 	function ephemera(emap) {
 		if (emap) {
 			ephemeraMap = emap;
-			PubSub.pub('aloha.ephemera', {
-				ephemera: ephemeraMap
-			});
 		}
+		PubSub.pub('aloha.ephemera', {
+			ephemera: ephemeraMap
+		});
 		return ephemeraMap;
 	}
 
@@ -303,6 +304,15 @@ define([
 	 */
 	function markWrapper(elem) {
 		$(elem).addClass('aloha-ephemera-wrapper');
+	}
+
+	/**
+	 * Marks an element as a ephemeral. If all subnodes are White Spaces,
+	 * the elements would be removed completed. Otherwise only the wrapper
+	 * will be removed, without deleting the subnodes. 
+	 */
+	function markWhiteSpaceWrapper(elem) {
+		$(elem).addClass('aloha-ephemera-empty-wrapper');
 	}
 
 	/**
@@ -393,20 +403,30 @@ define([
 	 */
 	function pruneElem(elem, emap) {
 		var className = elem.className;
-		if (className && -1 !== className.indexOf(commonClsSubstr)) {
+		// Because SVG elements will (sometimes) hold a SVGAnimatedString object
+		// (http://mdn.beonex.com/en/DOM/SVGStylable.html#Properties) instead of
+		// a string for the className property
+		if ('string' === typeof className && -1 !== className.indexOf(commonClsSubstr)) {
 			var classes = Strings.words(className);
 
 			// Ephemera.markElement()
-			if (-1 !== Arrays.indexOf(classes, 'aloha-cleanme')
-				    || -1 !== Arrays.indexOf(classes, 'aloha-ephemera')) {
+			if (-1 !== Arrays.indexOf(classes, 'aloha-cleanme') || -1 !== Arrays.indexOf(classes, 'aloha-ephemera')) {
 				$.removeData(elem); // avoids memory leak
 				return false; // removes the element
 			}
 
 			// Ephemera.markWrapper() and Ephemera.markFiller()
-			if (-1 !== Arrays.indexOf(classes, 'aloha-ephemera-wrapper')
-				    || -1 !== Arrays.indexOf(classes, 'aloha-ephemera-filler')) {
+			if (-1 !== Arrays.indexOf(classes, 'aloha-ephemera-wrapper') || -1 !== Arrays.indexOf(classes, 'aloha-ephemera-filler')) {
 				Dom.moveNextAll(elem.parentNode, elem.firstChild, elem.nextSibling);
+				$.removeData(elem);
+				return false;
+			}
+
+			// Ephemera.markWhiteSpaceWrapper() and Ephemera.markFiller()
+			if (-1 !== Arrays.indexOf(classes, 'aloha-ephemera-empty-wrapper')) {
+				if (!Html.hasOnlyWhiteSpaceChildren(elem)) {
+					Dom.moveNextAll(elem.parentNode, elem.firstChild, elem.nextSibling);
+				}
 				$.removeData(elem);
 				return false;
 			}
@@ -488,6 +508,7 @@ define([
 		markElement: markElement,
 		markAttr: markAttr,
 		markWrapper: markWrapper,
+		markWhiteSpaceWrapper: markWhiteSpaceWrapper,
 		markFiller: markFiller,
 		prune: prune,
 		isAttrEphemeral: isAttrEphemeral

@@ -1,4 +1,4 @@
-define(['jquery', 'util/arrays', 'util/maps', 'util/trees'], function($, Arrays, Maps, Trees){
+define(['jquery', 'util/arrays', 'util/maps', 'util/trees'], function ($, Arrays, Maps, Trees) {
 	var defaultToolbarSettings = {
 		tabs: [
 			// Format Tab
@@ -8,13 +8,13 @@ define(['jquery', 'util/arrays', 'util/maps', 'util/trees'], function($, Arrays,
 				components: [
 					[
 						'bold', 'strong', 'italic', 'emphasis', 'underline', '\n',
-						'subscript', 'superscript', 'strikethrough', 'quote'
+						'subscript', 'superscript', 'strikethrough', 'code', 'quote'
 					], [
 						'formatLink', 'formatAbbr', 'formatNumeratedHeaders', 'toggleDragDrop', '\n',
 						'toggleMetaView', 'wailang', 'toggleFormatlessPaste'
 					], [
 						'alignLeft', 'alignCenter', 'alignRight', 'alignJustify', '\n',
-						'orderedList', 'unorderedList', 'indentList', 'outdentList', 'colorPicker'
+						'orderedListFormatSelector', 'unorderedListFormatSelector', 'definitionListFormatSelector', '\n', 'indentList', 'outdentList', 'colorPicker'
 					], [
 						'formatBlock'
 					]
@@ -35,6 +35,12 @@ define(['jquery', 'util/arrays', 'util/maps', 'util/trees'], function($, Arrays,
 				label: 'tab.link.label',
 				showOn: { scope: 'link' },
 				components: [ 'editLink', 'removeLink', 'linkBrowser' ]
+			},
+			// Cite Tab
+			{
+				label : 'tab.cite.label',
+				showOn : { scope : 'cite' },
+				components : [ 'editCite', 'removeCite', '\n', 'editNote' ]
 			},
             // Image Tab
             {
@@ -68,7 +74,7 @@ define(['jquery', 'util/arrays', 'util/maps', 'util/trees'], function($, Arrays,
 				showOn: { scope: 'table.cell' },
 				components: [
 					[ "mergecells", "splitcells", "tableCaption",
-					  "tableSummary", "naturalFit" ],
+					  "naturalFit", "tableSummary" ],
 					[ "formatTable" ]
 				]
 			},
@@ -134,7 +140,7 @@ define(['jquery', 'util/arrays', 'util/maps', 'util/trees'], function($, Arrays,
 		var exclusionLookup = makeExclusionMap(userTabs, exclude);
 		function pruneDefaultComponents(form) {
 			return 'array' === $.type(form) ? !form.length : exclusionLookup[form];
-		};
+		}
 		userTabs = mergeDefaultComponents(userTabs, defaultTabsByLabel, pruneDefaultComponents);
 		defaultTabs = remainingDefaultTabs(defaultTabs, exclusionLookup, pruneDefaultComponents);
 		return userTabs.concat(defaultTabs);
@@ -162,12 +168,13 @@ define(['jquery', 'util/arrays', 'util/maps', 'util/trees'], function($, Arrays,
 
 	function mergeDefaultComponents(userTabs, defaultTabsByLabel, pruneDefaultComponents) {
 		var i,
-            tab,
-		    tabs = [],
-		    userTab,
-		    components,
-		    defaultTab,
-		    defaultComponents;
+			tab,
+			tabs = [],
+			userTab,
+			components,
+			defaultTab,
+			defaultComponents;
+
 		for (i = 0; i < userTabs.length; i++) {
 			userTab = userTabs[i];
 			components = userTab.components || [];

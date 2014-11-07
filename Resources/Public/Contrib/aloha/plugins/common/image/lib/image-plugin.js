@@ -1,48 +1,39 @@
-/*global documents: true define: true*/
-/*
-* Aloha Image Plugin - Allow image manipulation in Aloha Editor
-*
-* Author & Copyright (c) 2013 Gentics Software GmbH
-* aloha-sales@gentics.com
-* Contributors
-*		Johannes Schüth - http://jotschi.de
-*		Nicolas karageuzian - http://nka.me/
-*		Benjamin Athur Lupton - http://www.balupton.com/
-*		Thomas Lete
-*		Nils Dehl
-*		Christopher Hlubek
-*		Edward Tsech
-*		Haymo Meran
-*		Martin Schönberger
-*
-* Licensed under the terms of http://www.aloha-editor.org/license.php
-*/
-
+/* image-plugin.js is part of the Aloha Editor project http://aloha-editor.org
+ *
+ * Aloha Editor is a WYSIWYG HTML5 inline editing library and editor.
+ * Copyright (c) 2010-2014 Gentics Software GmbH, Vienna, Austria.
+ * Contributors http://aloha-editor.org/contribution.php
+ * License http://aloha-editor.org/license.php
+ */
 define([
-	// js
 	'jquery',
+	'PubSub',
+	'aloha/core',
 	'aloha/plugin',
+	'aloha/content-rules',
+	'util/dom',
 	'image/image-floatingMenu',
-	'i18n!aloha/nls/i18n',
 	'i18n!image/nls/i18n',
 	'jqueryui',
 	'image/vendor/jcrop/jquery.jcrop.min',
 	'image/vendor/mousewheel/mousewheel'
-], function AlohaImagePlugin(
-	aQuery,
+], function (
+	$,
+	PubSub,
+	Aloha,
 	Plugin,
+	ContentRules,
+	Dom,
 	ImageFloatingMenu,
-	i18nCore,
 	i18n
-){
-
+) {
 	'use strict';
 
-	var jQuery = aQuery;
-	var $ = aQuery;
-	var GENTICS = window.GENTICS;
-	var Aloha = window.Aloha;
+	var jQuery = $;
 	var resizing = false;
+	var aspectRatioValue = false;
+	var cropRatioValue = false;
+	var configurations = {};
 
 	// Attributes manipulation utilities
 	// Aloha team may want to factorize, it could be useful for other plugins
@@ -157,9 +148,9 @@ define([
 
 			$('body').trigger('aloha-image-cropped', [$image, props]);
 
-			// After successful cropping, the aspect ratio value has to recalculated
+			// After successful cropping, the aspect ratio value has to be recalculated
 			if (this.keepAspectRatio) {
-				this.aspectRatioValue = this.imageObj.width() / this.imageObj.height();
+				aspectRatioValue = this.imageObj.width() / this.imageObj.height();
 			}
 
 			// Call the custom onCropped function
@@ -174,10 +165,7 @@ define([
 			// No default behaviour defined besides event triggering
 			$('body').trigger('aloha-image-reset', $image);
 
-			$('#' + this.ui.imgResizeHeightField.getInputId()).val($image.height());
-			$('#' + this.ui.imgResizeWidthField.getInputId()).val($image.width());
-
-			// Call the custom resize function
+			// Call the custom reset function
 			return this.onReset($image);
 		},
 
@@ -189,8 +177,7 @@ define([
 			// No default behaviour defined besides event triggering
 			$('body').trigger('aloha-image-resize', $image);
 
-			$('#' + this.ui.imgResizeHeightField.getInputId()).val($image.height());
-			$('#' + this.ui.imgResizeWidthField.getInputId()).val($image.width());
+			this._applyValuesToFields($image.width(), $image.height());
 
 			// Call the custom resize function
 			this.onResize($image);
@@ -203,8 +190,7 @@ define([
 
 			$('body').trigger('aloha-image-resized', $image);
 
-			$('#' + this.ui.imgResizeHeightField.getInputId()).val($image.height());
-			$('#' + this.ui.imgResizeWidthField.getInputId()).val($image.width());
+			this._applyValuesToFields($image.width(), $image.height());
 
 			// Call the custom resize function
 			this.onResized($image);
@@ -229,11 +215,6 @@ define([
 		 * State variable for the aspect ratio toggle feature
 		 */
 		keepAspectRatio: false,
-
-		/**
-		 * Variable that will hold the value of the aspect ratio. This ratio will be used once startResize has been called
-		 */
-		aspectRatioValue: false,
 
 		/**
 		 * This will contain an image's original properties to be able to undo previous settings
@@ -265,7 +246,7 @@ define([
 
 			var imagePluginUrl = Aloha.getPluginUrl('image');
 
-			if ( typeof this.settings.objectTypeFilter != 'undefined' ) {
+			if (typeof this.settings.objectTypeFilter != 'undefined') {
 				this.objectTypeFilter = this.settings.objectTypeFilter;
 			}
 
@@ -274,8 +255,8 @@ define([
 			plugin.settings = jQuery.extend(true, plugin.defaultSettings, plugin.settings);
 
 			// Determine the flag and the value of the aspect ratio depending on settings
-			if ( typeof this.settings.fixedAspectRatio === 'number' ) {
-				this.aspectRatioValue = this.settings.fixedAspectRatio;
+			if (typeof this.settings.fixedAspectRatio === 'number') {
+				aspectRatioValue = cropRatioValue = this.settings.fixedAspectRatio;
 				plugin.keepAspectRatio = true;
 			} else {
 				if ((plugin.settings.fixedAspectRatio) === true) {
@@ -367,6 +348,21 @@ define([
 				plugin.clickImage(event);
 			});
 
+			PubSub.sub('aloha.editable.created', function (message) {
+				var enabled = false;
+				var config = plugin.getEditableConfig(message.editable.obj);
+
+				if (config && jQuery.inArray('img', config) > -1 && ContentRules.isAllowed(message.editable.obj[0], 'img')) {
+					enabled = true;
+				}
+				
+				configurations[message.editable.getId()] = enabled;
+			});
+
+			PubSub.sub('aloha.editable.destroyed', function (message) {
+				delete configurations[message.editable.getId()];
+			});
+
 			Aloha.bind('aloha-drop-files-in-editable', function (event, data) {
 				var img, len = data.filesObjs.length, fileObj, config;
 
@@ -387,17 +383,13 @@ define([
 						} else {
 							img.attr('src', fileObj.src);
 						}
-						GENTICS.Utils.Dom.insertIntoDOM(img, data.range, jQuery(Aloha.activeEditable.obj));
+						Dom.insertIntoDOM(img, data.range, Aloha.activeEditable.obj);
 					}
 				}
 
 			});
-			/*
-			 * Add the event handler for selection change
-			 */
-			Aloha.bind('aloha-selection-changed', function (event, rangeObject, originalEvent) {
-				var config, foundMarkup;
 
+			Aloha.bind('aloha-selection-changed', function (event, rangeObject, originalEvent) {
 				if (originalEvent && originalEvent.target) {
 					// Check if the element is currently being resized
 					if (plugin.settings.ui.resizable && !jQuery(originalEvent.target).hasClass('ui-resizable-handle')) {
@@ -407,36 +399,37 @@ define([
 					}
 				}
 
-				if (Aloha.activeEditable !== null) {
-					foundMarkup = plugin.findImgMarkup(rangeObject);
-					config = plugin.getEditableConfig(Aloha.activeEditable.obj);
-
-					if (typeof config !== 'undefined') {
-						plugin.ui._insertImageButton.show();
-					} else {
-						plugin.ui._insertImageButton.hide();
-						return;
-					}
-
-					// Enable image specific ui components if the element is an image
-					if (foundMarkup) { // TODO : this is always null (below is dead code, moving it to clickImage)
-						plugin.ui._insertImageButton.show();
-						plugin.ui.setScope();
-						if (plugin.settings.ui.meta) {
-							plugin.ui.imgSrcField.setTargetObject(foundMarkup, 'src');
-							plugin.ui.imgTitleField.setTargetObject(foundMarkup, 'title');
-						}
-						plugin.ui.imgSrcField.foreground();
-						plugin.ui.imgSrcField.focus();
-					} else {
-						if (plugin.settings.ui.meta) {
-							plugin.ui.imgSrcField.setTargetObject(null);
-						}
-					}
-					// TODO this should not be necessary here!
-					plugin.ui.doLayout();
+				if (!Aloha.activeEditable) {
+					return;
 				}
 
+				if (!configurations[Aloha.activeEditable.getId()]) {
+					plugin.ui._insertImageButton.hide();
+					return;
+				}
+
+				plugin.ui._insertImageButton.show();
+
+				var foundMarkup = plugin.findImgMarkup(rangeObject);
+
+				// Enable image specific ui components if the element is an image
+				if (foundMarkup) { // TODO : this is always null (below is dead code, moving it to clickImage)
+					plugin.ui._insertImageButton.show();
+					plugin.ui.setScope();
+					if (plugin.settings.ui.meta) {
+						plugin.ui.imgSrcField.setTargetObject(foundMarkup, 'src');
+						plugin.ui.imgTitleField.setTargetObject(foundMarkup, 'title');
+					}
+					plugin.ui.imgSrcField.foreground();
+					plugin.ui.imgSrcField.focus();
+				} else {
+					if (plugin.settings.ui.meta) {
+						plugin.ui.imgSrcField.setTargetObject(null);
+					}
+				}
+
+				// TODO this should not be necessary here!
+				plugin.ui.doLayout();
 			});
 
 			Aloha.bind('aloha-editable-created', function (event, editable) {
@@ -469,7 +462,7 @@ define([
 		 * Automatically resize the image to fit into defined bounds.
 		 * @param doScaleUp if true, small images are scaled up to fit minimum size
 		 */
-		autoResize: function(doScaleUp) {
+		autoResize: function (doScaleUp) {
 			// @todo handle ratio mismatches (eg 4:3 is set but image is 16:9 --> image needs to be cut)
 
 			var that = this;
@@ -512,8 +505,7 @@ define([
 					width = width * aspectRatio;
 				}
 
-				widthField.val(width);
-				heightField.val(height);
+				that._applyValuesToFields(width, height);
 
 				that.setSizeByFieldValue();
 				return true;
@@ -524,28 +516,41 @@ define([
 		/**
 		 * Toggle the keep aspect ratio functionality
 		 */
-		toggleKeepAspectRatio: function() {
+		toggleKeepAspectRatio: function () {
 
 			this.keepAspectRatio = !this.keepAspectRatio;
 
+			// while cropping: calculate the new aspect ratio value for the crop
 			if (typeof this.jcAPI !== 'undefined' && this.jcAPI !== null) {
-				//toggling keepaspectratio during crop is deactivated until implemented
-				//this.ui._imageCnrRatioButton.setState(false);
+				var selection = this.jcAPI.tellSelect();
 
+				if (!this.keepAspectRatio) {
+					cropRatioValue = false;
+				} else {
+					if (typeof this.settings.fixedAspectRatio !== 'number') {
+						if (selection.w / selection.h > 0) {
+							cropRatioValue = selection.w / selection.h;
+						} else {
+							cropRatioValue = this.imageObj.width() / this.imageObj.height();
+						}
+					} else {
+						cropRatioValue = this.settings.fixedAspectRatio;
+					}
+				}
+
+				this.jcAPI.setOptions(this.keepAspectRatio ? { aspectRatio: cropRatioValue} : { aspectRatio: 0 });
+				this.jcAPI.focus();
+
+			// if not in cropping mode: calculate the new aspect ratio value for image resizing
 			} else {
-
-
 				this.endResize();
 				if (!this.keepAspectRatio) {
-					this.aspectRatioValue = false;
+					aspectRatioValue = false;
 				} else {
-					// If no fixed aspect ratio was given a new start aspect ratio is calculated
-					// that will be used for the next startResize action
-
 					if ( typeof this.settings.fixedAspectRatio !== 'number' ) {
-						this.aspectRatioValue = this.imageObj.width() / this.imageObj.height();
+						aspectRatioValue = this.imageObj.width() / this.imageObj.height();
 					} else {
-						this.aspectRatioValue = this.settings.fixedAspectRatio;
+						aspectRatioValue = this.settings.fixedAspectRatio;
 					}
 				}
 				this.startResize();
@@ -580,8 +585,8 @@ define([
 							plugin.setSizeByFieldValue();
 						}
 					}
-				// 0-9 keys
-				} else if (e.keyCode <= 57 && e.keyCode >= 48 || e.keyCode <= 105 && e.keyCode >= 96 ) {
+					// 0-9 keys
+				} else if (e.keyCode <= 57 && e.keyCode >= 48 || e.keyCode <= 105 && e.keyCode >= 96) {
 
 					// Only resize if field values are ok
 					if (plugin._updateFields(fieldName, $(this).val(), false)) {
@@ -707,29 +712,23 @@ define([
 
 			var editable = currentImage.closest('.aloha-editable');
 
-			this.ui._imageCnrRatioButton.setState(this.keepAspectRatio);
+			plugin.ui._imageCnrRatioButton.setState(this.keepAspectRatio);
 
 			// Disabling the content editable. This will disable the resizeHandles in internet explorer
 			// already done in resize on a smaller scope, this block next aloha-selection-change event
 			// to be thrown
 			// editable.contentEditable(false);
 
-			//Store the current props of the image
-			this.restoreProps.push({
-				obj : e.srcElement,
+			// Store the current props of the image
+			plugin.restoreProps.push({
+				obj : plugin.imageObj,
 				src : plugin.imageObj.attr('src'),
 				width : plugin.imageObj.width(),
 				height : plugin.imageObj.height()
 			});
 
 			// Update the resize input fields with the new width and height
-			var heightField = $('#' + plugin.ui.imgResizeHeightField.getInputId());
-			heightField.val(plugin.imageObj.height());
-			heightField.css('background-color', '');
-
-			var widthField = $('#' + plugin.ui.imgResizeWidthField.getInputId());
-			widthField.val(plugin.imageObj.width());
-			widthField.css('background-color', '');
+			plugin._applyValuesToFields(plugin.imageObj.width(), plugin.imageObj.height());
 
 			if (plugin.settings.ui.meta) {
 				plugin.ui.imgSrcField.setTargetObject(plugin.imageObj, 'src');
@@ -743,7 +742,7 @@ define([
 			}
 
 			//to handle switching between images, aspect ratio is recalculated on click
-			plugin.aspectRatioValue = plugin.imageObj.width() / plugin.imageObj.height();
+			cropRatioValue = aspectRatioValue = plugin.imageObj.width() / plugin.imageObj.height();
 
 			if (plugin.settings.ui.resizable) {
 				plugin.startResize();
@@ -826,8 +825,8 @@ define([
 		_updateFields: function (primaryFieldName, newValue, isDecrement) {
 			var plugin = this;
 
-			var primaryField = null;
-			var secondaryField = null;
+			var $primaryField = null;
+			var $secondaryField = null;
 
 			var adjustedAspectRatio = null;
 			var primaryMin = null;
@@ -835,11 +834,19 @@ define([
 			var secondaryMin = null;
 			var secondaryMax = null;
 
-			//depending on the field that is edited, primary and secondary values are set
+			// If the aspect-ratio for cropping has been changed from the standard aspect-ratio,
+			// it is used for updating the fields (if keeping ratio is activated)
+			if (typeof plugin.jcAPI !== 'undefined' && plugin.jcAPI !== null) {
+				adjustedAspectRatio = cropRatioValue ? cropRatioValue : aspectRatioValue;
+			} else {
+				adjustedAspectRatio = aspectRatioValue;
+			}
+
+			// Depending on the field that is edited, primary and secondary values are set
 			if (primaryFieldName == 'width') {
-				primaryField = jQuery("#" + plugin.ui.imgResizeWidthField.getInputId());
-				secondaryField = jQuery("#" + plugin.ui.imgResizeHeightField.getInputId());
-				adjustedAspectRatio = ( 1 / plugin.aspectRatioValue );
+				$primaryField = $("#" + plugin.ui.imgResizeWidthField.getInputId());
+				$secondaryField = $("#" + plugin.ui.imgResizeHeightField.getInputId());
+				adjustedAspectRatio = (1 / adjustedAspectRatio);
 
 				primaryMin = plugin.settings.minWidth;
 				primaryMax = plugin.settings.maxWidth;
@@ -847,76 +854,76 @@ define([
 				secondaryMax = plugin.settings.maxHeight;
 
 			} else if (primaryFieldName == 'height') {
-				primaryField = jQuery("#" + plugin.ui.imgResizeHeightField.getInputId());
-				secondaryField = jQuery("#" + plugin.ui.imgResizeWidthField.getInputId());
-				adjustedAspectRatio = plugin.aspectRatioValue;
+				$primaryField = $("#" + plugin.ui.imgResizeHeightField.getInputId());
+				$secondaryField = $("#" + plugin.ui.imgResizeWidthField.getInputId());
+				adjustedAspectRatio = adjustedAspectRatio;
 
 				primaryMin = plugin.settings.minHeight;
 				primaryMax = plugin.settings.maxHeight;
 				secondaryMin = plugin.settings.minWidth;
 				secondaryMax = plugin.settings.maxWidth;
 			} else {
-				//if primaryFieldName is neither width nor height, don't update the fields
+				// If primaryFieldName is neither width nor height, don't update the fields
 				return false;
 			}
 
 			if (isNaN(newValue)) {
-				primaryField.css('background-color', 'red');
+				$primaryField.css('background-color', 'red');
 				// If the current value of the field can't be parsed it is not updated
 				return false;
 			}
 			else {
-				primaryField.val(newValue);
+				$primaryField.val(newValue);
 			}
 
 			var correctPrimary = true;
 
 			if (newValue > primaryMax) {
-				// Auto correct out of bounds values
+				// Auto-correct out of bounds values
 				if (plugin.settings.autoCorrectManualInput) {
-					primaryField.val(primaryMax);
-					newValue = primaryField.val();
-					primaryField.css('background-color', '');
+					$primaryField.val(primaryMax);
+					newValue = $primaryField.val();
+					$primaryField.css('background-color', '');
 					correctPrimary = true;
 				// Just notify the user, do nothing
 				} else {
-					primaryField.css('background-color', 'red');
+					$primaryField.css('background-color', 'red');
 					correctPrimary = false;
 				}
 			} else if (newValue < primaryMin) {
 				// Don't let the user decrement values below minimum
 				if (isDecrement) {
-					primaryField.val(primaryMin);
-					newValue = primaryField.val();
+					$primaryField.val(primaryMin);
+					newValue = $primaryField.val();
 					correctPrimary = true;
-				// Auto correct out of bounds values
+				// Auto-correct out of bounds values
 				} else if (plugin.settings.autoCorrectManualInput) {
-					primaryField.css('background-color', 'wheat');
+					$primaryField.css('background-color', 'wheat');
 					correctPrimary = false;
 				// Just notify the user, do nothing
 				} else {
-					primaryField.css('background-color', 'red');
+					$primaryField.css('background-color', 'red');
 					correctPrimary = false;
 				}
 			} else {
-				primaryField.css('background-color', '');
+				$primaryField.css('background-color', '');
 				correctPrimary = true;
 			}
 
 			var correctSecondary = true;
 
-			// if keep aspect ratio is enabled, the field that is not edited is updated as well
-			if ( plugin.keepAspectRatio ) {
+			// If keep aspect ratio is enabled, the field that is not edited is updated as well
+			if (plugin.keepAspectRatio) {
 				var secondary = Math.round(newValue * adjustedAspectRatio);
 
 				if (secondary > secondaryMax) {
-					// Auto correct out of bounds values
+					// Auto-correct out of bounds values
 					if (plugin.settings.autoCorrectManualInput) {
-						secondaryField.val(secondaryMax);
-						primaryField.val(secondaryField.val() / adjustedAspectRatio);
-						newValue = primaryField.val();
-						primaryField.css('background-color', '');
-						secondaryField.css('background-color', '');
+						$secondaryField.val(secondaryMax);
+						$primaryField.val($secondaryField.val() / adjustedAspectRatio);
+						newValue = $primaryField.val();
+						$primaryField.css('background-color', '');
+						$secondaryField.css('background-color', '');
 						correctSecondary = true;
 					// Just notify the user, do nothing
 					} else {
@@ -926,28 +933,33 @@ define([
 				} else if (secondary < secondaryMin) {
 					// Don't let the user decrement values below minimum
 					if (isDecrement) {
-						secondaryField.val(secondaryMin);
-						primaryField.val(secondaryField.val() / adjustedAspectRatio);
-						newValue = primaryField.val();
+						$secondaryField.val(secondaryMin);
+						$primaryField.val($secondaryField.val() / adjustedAspectRatio);
+						newValue = $primaryField.val();
 						correctPrimary = true;
-					// Auto correct out of bounds values
+					// Auto-correct out of bounds values
 					} else if (plugin.settings.autoCorrectManualInput) {
-						secondaryField.val(secondary);
-						secondaryField.css('background-color', 'wheat');
+						$secondaryField.val(secondary);
+						$secondaryField.css('background-color', 'wheat');
 						correctSecondary = false;
 					// Just notify the user, do nothing
 					} else {
-						secondaryField.css('background-color', 'red');
+						$secondaryField.css('background-color', 'red');
 						correctSecondary = false;
 					}
 				} else {
-					secondaryField.val(secondary);
-					secondaryField.css('background-color', '');
+					$secondaryField.val(secondary);
+					$secondaryField.css('background-color', '');
 					correctSecondary = true;
 				}
 			}
 
-			//Success if values are correct or have been adjusted accordingly
+			// Final check for value of secondary field, in case focus was changed
+			if ($secondaryField.val() < secondaryMin) {
+				correctSecondary = false;
+			}
+
+			// Success if values are correct or have been adjusted accordingly
 			if (correctPrimary && correctSecondary) {
 				return true;
 			}
@@ -958,26 +970,43 @@ define([
 		 * Helper function that will set the new image size using the field values
 		 */
 		setSizeByFieldValue: function () {
-			var plugin = this;
-			var width =  $('#' + plugin.ui.imgResizeWidthField.getInputId()).val();
-			var height = $('#' + plugin.ui.imgResizeHeightField.getInputId()).val();
-			plugin.setSize(width, height);
+			var width =  this.ui.imgResizeWidthField.getValue();
+			var height = this.ui.imgResizeHeightField.getValue();
+			this.setSize(width, height);
+		},
+
+		/**
+		 * Helper function that sets field values to specified parameters and resets background of fields
+		 * @param width new image-width in pixels
+		 * @param height new image-height in pixels
+		 */
+		_applyValuesToFields: function (width, height) {
+			this.ui.imgResizeWidthField.setValue(width);
+			this.ui.imgResizeHeightField.setValue(height);
+
+			this.ui.imgResizeWidthField.getInputJQuery().css('background-color', '');
+			this.ui.imgResizeHeightField.getInputJQuery().css('background-color', '');
 		},
 
 		/**
 		 * Helper function that will set the new crop area width and height using the field values
+		 *
+		 * note: because the _updateFields function does not consider the x and y of the croparea yet,
+		 * the value of the secondary field shown after setting croparea with manual input may be incorrect;
+		 * while this has no influence on the actual crop size, a future implementation should consider this
+		 * when calculating the field values
 		 */
 		setCropAreaByFieldValue: function () {
-			var plugin = this;
-			var currentCropArea = plugin.jcAPI.tellSelect();
+			var currentCropArea = this.jcAPI.tellSelect();
 
-			var width =  $('#' + plugin.ui.imgResizeWidthField.getInputId()).val();
-			width = parseInt(width, 10);
-			var height = $('#' + plugin.ui.imgResizeHeightField.getInputId()).val();
-			height = parseInt(height, 10);
+			var width =  parseInt(this.ui.imgResizeWidthField.getValue(), 10);
+			var height = parseInt(this.ui.imgResizeHeightField.getValue(), 10);
 
-			var selection = [currentCropArea['x'], currentCropArea['y'], currentCropArea['x'] + width,currentCropArea['y'] + height];
-			plugin.jcAPI.setSelect(selection);
+			var selection = [currentCropArea.x, currentCropArea.y, currentCropArea.x + width, currentCropArea.y + height];
+
+			this.jcAPI.setSelect(selection);
+			this._onCropSelect();
+			this.jcAPI.enable();
 		},
 
 		/**
@@ -997,16 +1026,15 @@ define([
 					newImg = jQuery(imagetag);
 					// add the click selection handler
 					//newImg.click( Aloha.Image.clickImage ); - Using delegate now
-					GENTICS.Utils.Dom.insertIntoDOM(newImg, range, jQuery(Aloha.activeEditable.obj));
+					Dom.insertIntoDOM(newImg, range, Aloha.activeEditable.obj);
 
-			} else {
-				Aloha.Log.error('img cannot markup a selection');
-				// TODO the desired behavior could be me the selected content is
-				// replaced by an image.
-				// TODO it should be editor's choice, with an NON-Ext Dialog instead of alert
-
-			}
-		},
+				} else {
+					Aloha.Log.error('img cannot markup a selection');
+					// TODO the desired behavior could be me the selected content is
+					// replaced by an image.
+					// TODO it should be editor's choice, with an NON-Ext Dialog instead of alert
+				}
+			},
 
 		srcChange: function () {
 			// TODO the src changed. I suggest :
@@ -1015,7 +1043,7 @@ define([
 			// 2. start a request to get the image
 			// 3a. the image is ok change the src
 			// 3b. the image is not availbable show an error.
-			 this.imageObj.attr('src', this.ui.imgSrcField.getValue()); // (the img tag)
+			this.imageObj.attr('src', this.ui.imgSrcField.getValue()); // (the img tag)
 //			 jQuery(img).attr('src', this.imgSrcField.getQueryValue()); // (the query value in the inputfield)
 //			 this.imgSrcField.getItem(); // (optinal a selected resource item)
 			// TODO additionally implement an srcChange Handler to let implementer
@@ -1025,7 +1053,7 @@ define([
 		/**
 		 * Reposition the crop buttons below the crop area
 		 */
-		positionCropButtons: function() {
+		positionCropButtons: function () {
 
 			var jt = jQuery('.jcrop-tracker:first'),
 				off = jt.offset(),
@@ -1061,7 +1089,7 @@ define([
 		 * Code imported from CropnResize Plugin
 		 *
 		 */
-		initCropButtons: function() {
+		initCropButtons: function () {
 			var that = this,
 				btns;
 
@@ -1082,7 +1110,7 @@ define([
 				that.endCrop();
 			});
 
-			this.interval = setInterval(function () {
+			this.interval = window.setInterval(function () {
 				that.positionCropButtons();
 			}, 10);
 		},
@@ -1092,7 +1120,7 @@ define([
 		 */
 		destroyCropButtons: function () {
 			jQuery('#aloha-CropNResize-btns').remove();
-			clearInterval(this.interval);
+			window.clearInterval(this.interval);
 		},
 
 		/**
@@ -1101,12 +1129,12 @@ define([
 		_disableSelection: function (el) {
 			el.find('*').attr('unselectable', 'on')
 					.css({
-					'-moz-user-select':'none',
-					'-webkit-user-select':'none',
-					'user-select':'none'
-					});
+					'-moz-user-select': 'none',
+					'-webkit-user-select': 'none',
+					'user-select': 'none'
+				});
 				/*
-					.each(function() {
+					.each(function () {
 					this.onselectstart = function () { return false; };
 					});
 					*/
@@ -1119,6 +1147,9 @@ define([
 		crop: function () {
 			var plugin = this;
 			var config = this.config;
+			var ratio = plugin.keepAspectRatio ? aspectRatioValue : false;
+
+			this.ui._imageCropButton.setState(true);
 
 			plugin.initCropButtons();
 			if (plugin.settings.ui.resizable) {
@@ -1132,7 +1163,9 @@ define([
 					window.setTimeout(function () {
 						plugin.ui.setScope();
 					}, 10);
-				}
+				},
+				aspectRatio: ratio,
+				minSize  : [plugin.settings.minWidth, plugin.settings.minHeight]
 			});
 
 			plugin._disableSelection($('.jcrop-holder'));
@@ -1147,8 +1180,6 @@ define([
 		_onCropSelect: function () {
 			var plugin = this;
 
-			jQuery('#aloha-CropNResize-btns').fadeIn('slow');
-
 			// Hide the crop buttons when the one of the handles is clicked
 			jQuery('.jcrop-handle').mousedown(function () {
 				jQuery('#aloha-CropNResize-btns').hide();
@@ -1160,17 +1191,17 @@ define([
 
 			// Update the width and height field using the initial active crop area values
 			if (typeof plugin.jcAPI !== 'undefined' && plugin.jcAPI !== null) {
-
 				plugin.positionCropButtons();
 				var currentCropArea = plugin.jcAPI.tellSelect();
 
-				var widthField = jQuery("#" + plugin.ui.imgResizeWidthField.getInputId()).val(currentCropArea['w']);
-				var heightField = jQuery("#" + plugin.ui.imgResizeHeightField.getInputId()).val(currentCropArea['h']);
+				if (currentCropArea.h > 0 && currentCropArea.w > 0) {
+					jQuery('#aloha-CropNResize-btns').fadeIn('slow');
+				}
 
+				plugin._applyValuesToFields(currentCropArea.w, currentCropArea.h);
 			}
 
 		},
-
 
 		/**
 		 * Terminates a crop
@@ -1191,9 +1222,7 @@ define([
 			$('body').trigger('aloha-image-crop-stop', [this.imageObj]);
 
 			//after cropping, field values are set to (once again) contain image width/height
-			$('#' + this.ui.imgResizeHeightField.getInputId()).val(this.imageObj.height());
-			$('#' + this.ui.imgResizeWidthField.getInputId()).val(this.imageObj.width());
-
+			this._applyValuesToFields(this.imageObj.width(), this.imageObj.height());
 		},
 
 		/**
@@ -1210,7 +1239,7 @@ define([
 		startResize: function () {
 			var plugin = this;
 			var currentImageObj = this.imageObj;
-			var ratio = plugin.keepAspectRatio ? plugin.aspectRatioValue : false;
+			var ratio = plugin.keepAspectRatio ? aspectRatioValue : false;
 
 			currentImageObj = this.imageObj.css({
 				height		: this.imageObj.height(),
@@ -1290,7 +1319,7 @@ define([
 		},
 
 		resetSize: function () {
-			var	plugin = this,
+			var plugin = this,
 				img = new Image();
 			img.onload = function () {
 				var myimage = plugin.getPluginFocus();
@@ -1309,10 +1338,13 @@ define([
 			};
 			img.src = plugin.getPluginFocus().attr('src');
 		},
+
 		/**
 		 * Reset the image to its original properties
 		 */
 		reset: function () {
+			var externalReset;
+
 			if (this.settings.ui.crop) {
 				this.endCrop();
 			}
@@ -1321,20 +1353,24 @@ define([
 				this.endResize();
 			}
 
-			if (this._onReset(this.imageObj)) {
-				// the external reset procedure has already performed a reset, so there is no need to apply an internal reset
-				return;
-			}
+			externalReset = this._onReset(this.imageObj);
 
-			for (var i = 0;i < this.restoreProps.length;i++) {
-				// restore from restoreProps if there is a match
-				if (this.imageObj.get(0) === this.restoreProps[i].obj) {
-					this.imageObj.attr('src', this.restoreProps[i].src);
-					this.imageObj.width(this.restoreProps[i].width);
-					this.imageObj.height(this.restoreProps[i].height);
-					return;
+			// if the external reset procedure has already performed a reset, there is no need to apply an internal reset
+			if (!externalReset) {
+				for (var i = 0;i < this.restoreProps.length;i++) {
+
+					// restore from restoreProps if there is a match
+					if (this.imageObj.get(0) === this.restoreProps[i].obj.get(0)) {
+						this.imageObj.attr('src', this.restoreProps[i].src);
+						this.imageObj.width(this.restoreProps[i].width);
+						this.imageObj.height(this.restoreProps[i].height);
+						break;
+					}
 				}
 			}
+
+			// readjust inputfields to show correct height/width
+			this._applyValuesToFields(this.imageObj.width(), this.imageObj.height());
 		}
 	});
 

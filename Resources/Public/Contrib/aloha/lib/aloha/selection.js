@@ -1,9 +1,9 @@
 /* selection.js is part of Aloha Editor project http://aloha-editor.org
  *
- * Aloha Editor is a WYSIWYG HTML5 inline editing library and editor. 
+ * Aloha Editor is a WYSIWYG HTML5 inline editing library and editor.
  * Copyright (c) 2010-2012 Gentics Software GmbH, Vienna, Austria.
- * Contributors http://aloha-editor.org/contribution.php 
- * 
+ * Contributors http://aloha-editor.org/contribution.php
+ *
  * Aloha Editor is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License
  * as published by the Free Software Foundation; either version 2
@@ -17,7 +17,7 @@
  * You should have received a copy of the GNU General Public License
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
- * 
+ *
  * As an additional permission to the GNU GPL version 2, you may distribute
  * non-source (e.g., minimized or compacted) forms of the Aloha-Editor
  * source code without the copy of the GNU GPL normally required,
@@ -31,6 +31,10 @@ define([
 	'util/range',
 	'util/arrays',
 	'util/strings',
+	'util/dom',
+	'util/dom2',
+	'util/browser',
+	'util/html',
 	'aloha/console',
 	'PubSub',
 	'aloha/engine',
@@ -43,6 +47,10 @@ define([
 	Range,
 	Arrays,
 	Strings,
+	Dom,
+	Dom2,
+	Browser,
+	Html,
 	console,
 	PubSub,
 	Engine,
@@ -144,6 +152,113 @@ define([
 	}
 
 	/**
+	 * Checks if `range` is contained inside an Aloha-Block
+	 * @param {Range} range
+	 * @return {*}
+	 */
+	function rangeStartInBlock(range) {
+		return jQuery(range.startContainer).closest('.aloha-editable,.aloha-block,.aloha-table-cell-editable,.aloha-table-cell_active')
+		                   .first()
+			               .hasClass('aloha-block');
+	}
+
+	/**
+	 * Gets parent block element
+	 *
+	 * @param {Element} element
+	 * @return {*}
+	 */
+	function getBlockElement(element) {
+		while (element && !Html.isBlock(element)) {
+			element = element.parentNode;
+		}
+		return element;
+	}
+
+	/**
+	 * Checks if `rangeObject` ends at the beginning of a text Node.
+	 *
+	 * @param {RangeObject} rangeObject
+	 * @return {boolean}
+	 */
+	function isEndContainerAtBeginTexNode(rangeObject) {
+		var endContainer = rangeObject.endContainer;
+		var endOffset = rangeObject.endOffset;
+		var i;
+
+		if (!Dom2.isTextNode(endContainer)) {
+			return false;
+		}
+
+		for (i = endOffset - 1; i >= 0; i--) {
+			if (jQuery.trim(endContainer.textContent[i]).length !== 0) {
+				return false;
+			}
+		}
+
+		return true;
+	}
+
+	/**
+	 * Checks if ranges ends in the beginning of a block element.
+	 *
+	 * @param {RangeObejct} rangeObejct
+	 * @return {boolean}
+	 */
+	function rangeEndsInBeginningBlockElement(rangeObejct) {
+		var endContainer = rangeObejct.endContainer;
+		var node = endContainer;
+
+		var blockElement = getBlockElement(rangeObejct.endContainer);
+
+		if (!isEndContainerAtBeginTexNode(rangeObejct)) {
+			return false;
+		}
+
+		node = node.previousSibling || node.parentNode;
+
+		while (node !== blockElement) {
+			if (node.previousSibling) {
+				node = node.previousSibling;
+				if (Html.isRenderedNode(node)) {
+					return false;
+				}
+			} else {
+				node = node.parentNode;
+			}
+		}
+
+		return node === blockElement;
+	}
+
+	/**
+	 * Sets the end of `range` before `element`.
+	 * @param {Range} range
+	 * @param {Element} element
+	 */
+	function setEndRangeBeforeElement(range, element) {
+		range.setEndBefore(element);
+
+		Aloha.getSelection().removeAllRanges();
+		Aloha.getSelection().addRange(range);
+	}
+
+	/**
+	 * Corrects the range if the range is expanded and it ends in the beginning of a
+	 * block element.
+	 *
+	 * @param {RangeObject} rangeObject
+	 */
+	function correctFirefoxRangeIssue(rangeObject) {
+		if (!rangeObject.isCollapsed() && rangeEndsInBeginningBlockElement(rangeObject)) {
+			var blockElement = getBlockElement(rangeObject.endContainer);
+			var range = Aloha.getSelection().getRangeAt(0);
+
+			setEndRangeBeforeElement(range, blockElement);
+		}
+	}
+
+	/**
 	 * @namespace Aloha
 	 * @class Selection
 	 * This singleton class always represents the current user selection
@@ -155,6 +270,8 @@ define([
 			this.rangeObject = {};
 
 			this.preventSelectionChangedFlag = false; // will remember if someone urged us to skip the next aloha-selection-changed event
+
+			this.correctSelectionFlag = false; // this is true, when the current selection is corrected (to prevent endless loops)
 
 			// define basics first
 			this.tagHierarchy = {
@@ -253,6 +370,42 @@ define([
 				'ol': {
 					'li': true
 				},
+				'dl': {
+					'dt': true,
+					'dd': true
+				},
+				'dt': {
+					'textNode': true
+				},
+				'dd': {
+					'textNode': true,
+					'b': true,
+					'i': true,
+					'em': true,
+					'sup': true,
+					'sub': true,
+					'br': true,
+					'span': true,
+					'img': true,
+					'ul': true,
+					'ol': true,
+					'dt': true,
+					'table': true,
+					'h1': true,
+					'h2': true,
+					'h3': true,
+					'h4': true,
+					'h5': true,
+					'h6': true,
+					'del': true,
+					'ins': true,
+					'u': true,
+					'p': true,
+					'div': true,
+					'pre': true,
+					'blockquote': true,
+					'a': true
+				},
 				'li': {
 					'textNode': true,
 					'b': true,
@@ -271,6 +424,7 @@ define([
 					'h4': true,
 					'h5': true,
 					'h6': true,
+					'p': true,
 					'del': true,
 					'ins': true,
 					'u': true,
@@ -295,6 +449,7 @@ define([
 					'img': true,
 					'ul': true,
 					'ol': true,
+					'dt': true,
 					'table': true,
 					'h1': true,
 					'h2': true,
@@ -354,8 +509,8 @@ define([
 				'a': this.tagHierarchy.b,
 				'ul': this.tagHierarchy.ul,
 				'ol': this.tagHierarchy.ol,
+				'dl': this.tagHierarchy.dl,
 				'li': this.tagHierarchy.li,
-				'td': this.tagHierarchy.li,
 				'div': this.tagHierarchy.div,
 				'h1': this.tagHierarchy.h1,
 				'h2': this.tagHierarchy.h1,
@@ -363,7 +518,14 @@ define([
 				'h4': this.tagHierarchy.h1,
 				'h5': this.tagHierarchy.h1,
 				'h6': this.tagHierarchy.h1,
-				'table': this.tagHierarchy.table
+				// for tables (and all related tags) we set the hierarchy to div
+				// this enables to add anything into tables. We also need to set this
+				// for tr, td and th, because the check in canTag1WrapTag2 does not check
+				// transitively
+				'table': this.tagHierarchy.div,
+				'tr': this.tagHierarchy.div,
+				'th': this.tagHierarchy.div,
+				'td': this.tagHierarchy.div
 			};
 
 			// When applying this elements to selection they will replace the assigned elements
@@ -431,7 +593,7 @@ define([
 		 * @return true when rangeObject was modified, false otherwise
 		 * @hide
 		 */
-		onChange: function (objectClicked, event, timeout) {
+		onChange: function (objectClicked, event, timeout, editableChanged) {
 			if (this.updateSelectionTimeout) {
 				window.clearTimeout(this.updateSelectionTimeout);
 			}
@@ -453,6 +615,24 @@ define([
 						selection.onChange(objectClicked, event, 10 + (timeout || 5) * 2);
 					}
 					return;
+				} else {
+					// And yet another IE workaround. Somehow the caret is not
+					// positioned inside the clicked editable. This occures only
+					// when switching editables in IE. In those cases the caret is
+					// invisible. I tried to trace the origin of the issue but i
+					// could not find the place where the caret is mispositioned.
+					// I noticed that IE is sometimes adding drag handles to
+					// editables. Aloha is removing those handles.
+					// If those handles are visible it apears that two clicks are needed
+					// to activate the editable. The first click is to select the
+					// editable and the second to enable it and activeate it. I added a
+					// range select call that will cirumvent this issue by resetting
+					// the selection. I also checked the range object. In all cases
+					// i found the range object contained correct properties. The
+					// workaround will only be applied for IE.
+					if (Aloha.browser.msie && editableChanged) {
+						range.select();
+					}
 				}
 				Aloha.Selection._updateSelection(event, range);
 			}, timeout || 5);
@@ -532,30 +712,57 @@ define([
 			this.rangeObject = range =
 					range || new Aloha.Selection.SelectionRange(true);
 
+			// workaround for FF selection bug, where it is possible to move the selection INTO a hr
+			if (range && range.startContainer
+					&& 'HR' === range.startContainer.nodeName
+					&& range.endContainer
+					&& 'HR' === range.endContainer.nodeName) {
+				Aloha.getSelection().removeAllRanges();
+				return true;
+			}
+
 			// Determine the common ancestor container and update the selection
 			// tree.
 			range.update();
 
 			// Workaround for nasty IE bug that allows the user to select
 			// text nodes inside areas with contenteditable "false"
-			if (range && range.startContainer && range.endContainer) {
+			if (range && range.startContainer && range.endContainer && !this.correctSelectionFlag) {
 				var inEditable =
 						jQuery(range.commonAncestorContainer)
 							.closest('.aloha-editable').length > 0;
 
-				if (inEditable) {
-					var validStartPosition = !(3 === range.startContainer.nodeType &&
-							!jQuery(range.startContainer.parentNode).contentEditable());
+				if (inEditable && !rangeStartInBlock(range)) {
+					var validStartPosition = this._validEditablePosition(range.startContainer);
+					var validEndPosition = this._validEditablePosition(range.endContainer);
+					var newPos;
+					// when we are moving down (with the cursor down key), we want to position the
+					// cursor AFTER the non-editable area
+					// otherwise BEFORE the non-editable area
+					var movingDown = event && (event.keyCode === 40);
 
-					var validEndPosition = !(3 === range.endContainer.nodeType &&
-							!jQuery(range.endContainer.parentNode).contentEditable());
-
+					if (!validStartPosition) {
+						newPos = this._getNearestEditablePosition(range.startContainer, movingDown);
+						if (newPos) {
+							range.startContainer = newPos.container;
+							range.startOffset = newPos.offset;
+						}
+					}
+					if (!validEndPosition) {
+						newPos = this._getNearestEditablePosition(range.endContainer, movingDown);
+						if (newPos) {
+							range.endContainer = newPos.container;
+							range.endOffset = newPos.offset;
+						}
+					}
 					if (!validStartPosition || !validEndPosition) {
-						Aloha.getSelection().removeAllRanges();
-						return true;
+						this.correctSelectionFlag = true;
+						range.correctRange();
+						range.select();
 					}
 				}
 			}
+			this.correctSelectionFlag = false;
 
 			// check if aloha-selection-changed event has been prevented
 			if (this.isSelectionChangedPrevented()) {
@@ -573,6 +780,71 @@ define([
 			Aloha.trigger('aloha-selection-changed-after', [this.rangeObject, event]);
 
 			return true;
+		},
+
+		/**
+		 * Check whether a position with the given node as container is a valid editable position
+		 * @param {DOMObject} node DOM node
+		 * @return true if the position is editable, false if not
+		 */
+		_validEditablePosition: function (node) {
+			if (!node) {
+				return false;
+			}
+			switch (node.nodeType) {
+			case 1:
+				return jQuery(node).contentEditable();
+			case 3:
+				return jQuery(node.parentNode).contentEditable();
+			default:
+				return false;
+			}
+		},
+
+		/**
+		 * Starting with the given node (which is supposed to be not editable)
+		 * find the nearest editable position
+		 * 
+		 * @param {DOMObject} node DOM node
+		 * @param {Boolean} forward true for searching forward, false for searching backward
+		 */
+		_getNearestEditablePosition: function (node, forward) {
+			var current = node;
+			var parent = current.parentNode;
+			while (parent !== null && !jQuery(parent).contentEditable()) {
+				current = parent;
+				parent = parent.parentNode;
+			}
+			if (current === null) {
+				return false;
+			}
+			if (forward) {
+				// check whether the element after the non editable element is editable and a blocklevel element
+				if (Dom.isBlockLevelElement(current.nextSibling) && jQuery(current.nextSibling).contentEditable()) {
+					return {
+						container: current.nextSibling,
+						offset: 0
+					};
+				} else {
+					return {
+						container: parent,
+						offset: Dom.getIndexInParent(current) + 1
+					};
+				}
+			} else {
+				// check whether the element before the non editable element is editable and a blocklevel element
+				if (Dom.isBlockLevelElement(current.previousSibling) && jQuery(current.previousSibling).contentEditable()) {
+					return {
+						container: current.previousSibling,
+						offset: current.previousSibling.childNodes.length
+					};
+				} else {
+					return {
+						container: parent,
+						offset: Dom.getIndexInParent(current)
+					};
+				}
+			}
 		},
 
 		/**
@@ -1051,7 +1323,7 @@ define([
 					}
 
 					// setting the focus is needed for mozilla and IE 7 to have a working rangeObject.select()
-					if (Aloha.activeEditable && jQuery.browser.mozilla) {
+					if (Aloha.activeEditable && Aloha.browser.mozilla) {
 						Aloha.activeEditable.obj.focus();
 					}
 
@@ -1341,12 +1613,26 @@ define([
 		},
 
 		/**
+		 * Checks for Firefox incorrect range. When selecting a paragraph with the
+		 * command 'shift+keydown', the selection ends in the start of the next paragraph
+		 * instead of at the end of the selected paragraph. This produces an unexpected
+		 * behaviour when formatting the selected text to a heading or a list, because the
+		 * result included one extra paragraph.
+		 */
+		checkForFirefoxIncorrectRange: function () {
+			if (Browser.mozilla && Aloha.getSelection().getRangeCount() !== 0) {
+				correctFirefoxRangeIssue(this.getRangeObject());
+			}
+		},
+
+		/**
 		 * apply a certain markup to the current selection
 		 * @param markupObject jQuery object of the markup to be applied (e.g. created with obj = jQuery('<b></b>'); )
 		 * @return void
 		 * @hide
 		 */
 		changeMarkupOnSelection: function (markupObject) {
+			this.checkForFirefoxIncorrectRange();
 			var rangeObject = this.getRangeObject();
 
 			// change the markup
@@ -1570,7 +1856,7 @@ define([
 
 				// make a fix for text nodes in <li>'s in ie
 				jQuery.each(objects2wrap, function (index, element) {
-					if (jQuery.browser.msie && element.nodeType == 3 && !element.nextSibling && !element.previousSibling && element.parentNode && element.parentNode.nodeName.toLowerCase() == 'li') {
+					if (Aloha.browser.msie && element.nodeType == 3 && !element.nextSibling && !element.previousSibling && element.parentNode && element.parentNode.nodeName.toLowerCase() == 'li') {
 						element.data = jQuery.trim(element.data);
 					}
 				});
@@ -2122,7 +2408,7 @@ define([
 	 */
 	function nestedListInIEWorkaround(range) {
 		var nextSibling;
-		if (jQuery.browser.msie && range.startContainer === range.endContainer && range.startOffset === range.endOffset && range.startContainer.nodeType == 3 && range.startOffset == range.startContainer.data.length && range.startContainer.nextSibling) {
+		if (Aloha.browser.msie && range.startContainer === range.endContainer && range.startOffset === range.endOffset && range.startContainer.nodeType == 3 && range.startOffset == range.startContainer.data.length && range.startContainer.nextSibling) {
 			nextSibling = range.startContainer.nextSibling;
 			if ('OL' === nextSibling.nodeName || 'UL' === nextSibling.nodeName) {
 				if (range.startContainer.data[range.startContainer.data.length - 1] == ' ') {
@@ -2166,7 +2452,7 @@ define([
 		anchorNode: null,
 
 		/**
-		 * Returns the offset of the start of the selection relative to the element that contains the start 
+		 * Returns the offset of the start of the selection relative to the element that contains the start
 		 * of the selection. Returns 0 if there's no selection.
 		 * @readonly
 		 * @type int
@@ -2182,7 +2468,7 @@ define([
 		focusNode: null,
 
 		/**
-		 * Returns the offset of the end of the selection relative to the element that contains the end 
+		 * Returns the offset of the end of the selection relative to the element that contains the end
 		 * of the selection. Returns 0 if there's no selection.
 		 * @readonly
 		 * @type int
@@ -2223,7 +2509,7 @@ define([
 			throw "NOT_IMPLEMENTED";
 		},
 
-		/** 
+		/**
 		 * @void
 		 */
 		extend: function (parentNode, offset) {
@@ -2231,9 +2517,9 @@ define([
 		},
 
 		/**
-		 * @param alter DOMString 
-		 * @param direction DOMString 
-		 * @param granularity DOMString 
+		 * @param alter DOMString
+		 * @param direction DOMString
+		 * @param granularity DOMString
 		 * @void
 		 */
 		modify: function (alter, direction, granularity) {
@@ -2273,13 +2559,13 @@ define([
 		 * so even if we normalize it during getRangeAt, in IE, we will be
 		 * correcting the range to the "correct" place, but still not the place
 		 * where it was originally set.
-		 * 
+		 *
 		 * Returns the given range.
-		 * The getRangeAt(index) method returns the indexth range in the list. 
+		 * The getRangeAt(index) method returns the indexth range in the list.
 		 * NOTE: Aloha Editor only support 1 range! index can only be 0
-		 * @throws INDEX_SIZE_ERR DOM exception if index is less than zero or 
+		 * @throws INDEX_SIZE_ERR DOM exception if index is less than zero or
 		 * greater or equal to the value returned by the rangeCount.
-		 * @param index int 
+		 * @param index int
 		 * @return Range return the selected range from index
 		 */
 		getRangeAt: function (index) {
@@ -2293,12 +2579,12 @@ define([
 		/**
 		 * Adds the given range to the selection.
 		 * The addRange(range) method adds the given range Range object to the list of
-		 * selections, at the end (so the newly added range is the new last range). 
-		 * NOTE: Aloha Editor only support 1 range! The added range will replace the 
+		 * selections, at the end (so the newly added range is the new last range).
+		 * NOTE: Aloha Editor only support 1 range! The added range will replace the
 		 * range at index 0
 		 * see http://html5.org/specs/dom-range.html#selection note about addRange
 		 * @throws an INVALID_NODE_TYPE_ERR exception if the given Range has a boundary point
-		 * node that's not a Text or Element node, and an INVALID_MODIFICATION_ERR exception 
+		 * node that's not a Text or Element node, and an INVALID_MODIFICATION_ERR exception
 		 * if it has a boundary point node that doesn't descend from a Document.
 		 * @param range Range adds the range to the selection
 		 * @void
@@ -2317,7 +2603,7 @@ define([
 
 		/**
 		 * Removes the given range from the selection, if the range was one of the ones in the selection.
-		 * NOTE: Aloha Editor only support 1 range! The added range will replace the 
+		 * NOTE: Aloha Editor only support 1 range! The added range will replace the
 		 * range at with index 0
 		 * @param range Range removes the range from the selection
 		 * @void
@@ -2339,7 +2625,7 @@ define([
 		 * Aloha, has no use otherwise Updates the rangeObject
 		 * according to the current user selection Method is
 		 * always called on selection change
-		 * 
+		 *
 		 * @param event
 		 *            jQuery browser event object
 		 * @return true when rangeObject was modified, false
@@ -2352,7 +2638,7 @@ define([
 
 		/**
 		 * String representation
-		 * 
+		 *
 		 * @return "Aloha.Selection"
 		 * @hide
 		 */
@@ -2376,7 +2662,7 @@ define([
 	Aloha.getSelection = function (target) {
 		target = (target !== document || target !== window) ? window : target;
 		// Aloha.Selection.refresh()
-		// implement Aloha Selection 
+		// implement Aloha Selection
 		// TODO cache
 		return new AlohaSelection(window.rangy.getSelection(target));
 	};

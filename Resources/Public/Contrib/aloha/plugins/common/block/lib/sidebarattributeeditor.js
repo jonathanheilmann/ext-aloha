@@ -36,11 +36,16 @@ define([ 'jquery', 'block/blockmanager', 'aloha/sidebar', 'block/editormanager',
 	 * @name block.sidebarattributeeditor
 	 * @class Sidebar attribute editor singleton
 	 */
-	return new (Class.extend(
-	/** @lends block.sidebarattributeeditor */
-	{
+		return new (Class.extend(
+		/** @lends block.sidebarattributeeditor */
+		{
 
-		_sidebar: null,
+			_sidebar: null,
+
+		/**
+		 * Panels, which were added to the sidebar for blocks
+		 */
+		_blockPanels: [],
 
 		/**
 		 * Initialize the sidebar attribute editor and bind events
@@ -55,14 +60,20 @@ define([ 'jquery', 'block/blockmanager', 'aloha/sidebar', 'block/editormanager',
 		 * @param {Array} selectedBlocks
 		 */
 		_onBlockSelectionChange: function(selectedBlocks) {
-			var that = this;
+			var that = this, panel;
 			if (!this._sidebar) {
 				return;
 			}
-			// TODO: Clearing the whole sidebar might not be what we want; instead we might only want
-			// to clear certain panels.
-			// that._sidebar.container.find('.aloha-sidebar-panels').children().remove();
-			// that._sidebar.panels = {};
+
+			// remove all panels from the sidebar, which were added for blocks
+			for (panel in that._blockPanels) {
+				if (that._blockPanels.hasOwnProperty(panel)) {
+					panel = that._blockPanels[panel];
+					jQuery(panel.element).remove();
+					delete this._sidebar.panels[panel.id];
+				}
+			}
+			this._blockPanels = [];
 
 			jQuery.each(selectedBlocks, function() {
 				var schema = this.getSchema(),
@@ -74,7 +85,7 @@ define([ 'jquery', 'block/blockmanager', 'aloha/sidebar', 'block/editormanager',
 					return;
 				}
 
-				that._sidebar.addPanel({
+				that._blockPanels.push(that._sidebar.addPanel({
 					title: block.getTitle(),
 					expanded: true,
 					onInit: function() {
@@ -89,29 +100,29 @@ define([ 'jquery', 'block/blockmanager', 'aloha/sidebar', 'block/editormanager',
 							// Editor -> Block binding
 							editor.bind('change', function(value) {
 								block.attr(attributeName, value);
+								});
+
+								// Block -> Editor binding
+								block.bind('change', function () {
+									editor.setValue(block.attr(attributeName));
 							});
 
-							// Block -> Editor binding
-							block.bind('change', function() {
+								$form.append(editor.render());
+
+								// Set initial value Block -> Editor
 								editor.setValue(block.attr(attributeName));
-							})
+	
+								editors.push(editor);
+							});
+							this.setContent($form);
+						},
 
-							$form.append(editor.render());
-
-							// Set initial value Block -> Editor
-							editor.setValue(block.attr(attributeName));
-
-							editors.push(editor);
-						});
-						this.setContent($form);
-					},
-
-					deactivate: function() {
-						// On deactivating the panel, we need to tell each editor to deactivate itself,
-						// so it can throw another change event if the value has been modified.
-						jQuery.each(editors, function(index, editor) {
-							editor._deactivate();
-						});
+						deactivate: function () {
+							// On deactivating the panel, we need to tell each editor to deactivate itself,
+							// so it can throw another change event if the value has been modified.
+							jQuery.each(editors, function (index, editor) {
+								editor._deactivate();
+							});
 
 						// This code is from the superclass
 						this.isActive = false;
@@ -119,7 +130,7 @@ define([ 'jquery', 'block/blockmanager', 'aloha/sidebar', 'block/editormanager',
 						// this.content.parent('li').hide();
 						this.effectiveElement = null;
 					}
-				});
+				}));
 			});
 		}
 	}))();

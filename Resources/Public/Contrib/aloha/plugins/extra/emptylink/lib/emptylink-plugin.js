@@ -1,4 +1,6 @@
-/* speak-plugin.js is part of Aloha Editor project http://aloha-editor.org
+/*global define: true */
+
+/* emptylink-plugin.js is part of Aloha Editor project http://aloha-editor.org
  *
  * Aloha Editor is a WYSIWYG HTML5 inline editing library and editor. 
  * Copyright (c) 2010-2012 Gentics Software GmbH, Vienna, Austria.
@@ -24,40 +26,34 @@
  * provided you include this license notice and a URL through which
  * recipients can access the Corresponding Source.
  */
+/**
+ * @name emptylink
+ * @namespace emptylink plugin
+ */
 define([
-    'aloha/plugin',
-	'aloha/floatingmenu',
-	'i18n!aloha/nls/i18n'
-], function ( Plugin, FloatingMenu, i18nCore ) {
+	'aloha/plugin',
+	'css!emptylink/css/emptylink.css'
+], function (
+	Plugin
+) {
 	'use strict';
-	
-	return Plugin.create('speak', {
-		
-		init: function () {
-			var that = this;
-			
-			Aloha.require(['speak/speak','css!speak/css/speak.css']);
-			
-			Aloha.jQuery('body').append('<div id="audio"></div>')
-			
-			var button = new Aloha.ui.Button({
-				name      : 'speak',
-				text      : 'Speak',					// that.i18n('button.' + button + '.text'),
-				iconClass : 'GENTICS_button_speak',
-				size      : 'small',
-				onclick   : function() {
-					var range = Aloha.getSelection().getRangeAt( 0 );
-					speak( Aloha.jQuery(range.startContainer.parentNode).text() );
-				}
-			});
-			FloatingMenu.addButton(
-				'Aloha.continuoustext',
-				button,
-				i18nCore.t('floatingmenu.tab.format'),
-				1
-			);
-		}
-	});
-	
-});
 
+	var PLUGIN_NAME = 'emptylink';
+
+	/**
+	 * @type {Aloha.Plugin}
+	 */
+	return Plugin.create(PLUGIN_NAME, {
+		/**
+		 * Default config: plugin active for all editables
+		 */
+		config: [PLUGIN_NAME],
+
+		/**
+		 * Initialize the plugin
+		 */
+		init: function () {
+		}
+
+	});
+});

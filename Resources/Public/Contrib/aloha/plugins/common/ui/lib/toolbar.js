@@ -18,6 +18,12 @@ define([
 ) {
 	'use strict';
 
+	function isFloatingEnabled() {
+		return !Aloha.settings
+			|| !Aloha.settings.toolbar
+			|| Aloha.settings.toolbar.floating !== false;
+	}
+
 	/**
 	 * The toolbar is configured via `settings.toolbar` and is defined as an
 	 * array of tabs with component groups, where the groups are arrays of
@@ -77,7 +83,9 @@ define([
 
 			// Pinning behaviour is global in that if one toolbar is pinned,
 			// then all other toolbars will be pinned to that position.
-			floating.makeFloating(this, Toolbar);
+			if (isFloatingEnabled()) {
+				floating.makeFloating(this, Toolbar);
+			}
 		},
 
 		adoptInto: function (slot, component) {
@@ -105,9 +113,9 @@ define([
 			// caluclated.
 			var toolbar = this;
 			if (toolbar._moveTimeout) {
-				clearTimeout(toolbar._moveTimeout);
+				window.clearTimeout(toolbar._moveTimeout);
 			}
-			toolbar._moveTimeout = setTimeout(function () {
+			toolbar._moveTimeout = window.setTimeout(function () {
 				toolbar._moveTimeout = null;
 				if (Aloha.activeEditable && Toolbar.isFloatingMode) {
 					floating.floatSurface(
@@ -166,12 +174,14 @@ define([
 			Toolbar.$surfaceContainer.children().detach();
 			Toolbar.$surfaceContainer.append(this.$element);
 			Toolbar.$surfaceContainer.stop().fadeTo(200, 1);
-			var position = Toolbar.getFloatingPosition();
-			this.$element.stop().css({
-				top: position.top,
-				left: position.left
-			});
-			this._move();
+			if (isFloatingEnabled()) {
+				var position = Toolbar.getFloatingPosition();
+				this.$element.stop().css({
+					top: position.top,
+					left: position.left
+				});
+				this._move();
+			}
 		},
 
 		/**
@@ -224,7 +234,9 @@ define([
 
 			// In the built aloha.js, init will happend before the body has
 			// finished loading, so we have to defer appending the element.
-			$(function () { Toolbar.$surfaceContainer.appendTo('body'); });
+			$(function () {
+				Toolbar.$surfaceContainer.appendTo('body');
+			});
 			Surface.trackRange(Toolbar.$surfaceContainer);
 			var pinState = floating.getPinState();
 			Toolbar.pinTop = pinState.top;

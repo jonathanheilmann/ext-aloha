@@ -1,7 +1,16 @@
-define(
-['jquery', 'table/table-plugin-utils'],
-
-function (jQuery, Utils) {
+define([
+	'aloha',
+	'aloha/jquery',
+	'aloha/ephemera',
+	'table/table-plugin-utils',
+	'util/browser'
+], function (
+	Aloha,
+	jQuery,
+	Ephemera,
+	Utils,
+	Browser
+) {
 	/**
 	 * Constructs a TableCell.
 	 *
@@ -13,7 +22,7 @@ function (jQuery, Utils) {
 	 */
 	var TableCell = function (originalTd, tableObj) {
 		if (null == originalTd) {
-			originalTd = '<td>&nbsp;</td>';
+			originalTd = '<td></td>';
 		}
 
 		//original Td must be a DOM node so that the this.obj.context property is available
@@ -58,7 +67,10 @@ function (jQuery, Utils) {
 		// create the editable wrapper for the cells
 		var $wrapper = $elem.children('div').eq(0);
 		$wrapper.contentEditable(true);
-		$wrapper.addClass('aloha-table-cell-editable aloha-ephemera-filler');
+		$wrapper.addClass('aloha-table-cell-editable');
+
+		// mark the editable wrapper as ephemeral
+		Ephemera.markWrapper($wrapper);
 
 		// attach events to the editable div-object
 		$wrapper.bind('focus', function ($event) {
@@ -310,13 +322,11 @@ function (jQuery, Utils) {
 
 			//bind a global mouseup event handler to stop cell selection
 			var that = this;
-			jQuery('body').bind('mouseup.cellselection', function () {
+			jQuery('body').bind('mouseup.cellselection', function(event) {
 				that._endCellSelection();
-
 			});
 
 			this.tableObj.selection.baseCellPosition = [this._virtualY(), this._virtualX()];
-
 		}
 	};
 
@@ -324,7 +334,9 @@ function (jQuery, Utils) {
 	 * Ends the cell selection mode
 	 */
 	TableCell.prototype._endCellSelection = function() {
-		if(this.tableObj.selection.cellSelectionMode) {
+		if (this.tableObj.selection.cellSelectionMode) {
+			Utils.selectAnchorContents(this.tableObj.selection.selectedCells);
+
 			this.tableObj.selection.cellSelectionMode = false;
 			this.tableObj.selection.baseCellPosition = null;
 			this.tableObj.selection.lastSelectionRange = null;
@@ -447,7 +459,11 @@ function (jQuery, Utils) {
 		this.tableObj.selection.unselectCells();
 
 		if (this.tableObj.hasFocus) {
-			jqEvent.stopPropagation();
+			if (typeof jqEvent.stopPropagation === 'function') {
+				jqEvent.stopPropagation();
+			} else if (typeof jqEvent.cancelBubble !== 'undefined') {
+				jqEvent.cancelBubble = true;
+			}
 		}
 	};
 
@@ -475,23 +491,21 @@ function (jQuery, Utils) {
 	 */
 	TableCell.prototype._editableKeyDown = function (jqEvent) {
 		var KEYCODE_TAB = 9;
-
 		this._checkForEmptyEvent(jqEvent);
-
-		if ( this.obj[0] === this.tableObj.obj.find('tr:last td:last')[0] ) {
-			// only add a row on a single key-press of tab (so check
-			// that alt-, shift- or ctrl-key are NOT pressed)
+		if (this.obj[0] === this.tableObj.obj.find('tr:last td:last')[0]) {
+			// only add a row on a single key-press of tab (so check that alt-,
+			// shift- or ctrl-key are NOT pressed)
 			if (KEYCODE_TAB == jqEvent.keyCode && !jqEvent.altKey && !jqEvent.shiftKey && !jqEvent.ctrlKey) {
-				// add a row after the current row
-				this.tableObj.addRow(this.obj.parent().index() + 1);
+				var lastInsertedRow = this.tableObj.addRow(this.obj.parent().index() + 1);
 
-				// firefox needs this for the first cell of the new row
-				// to be selected (.focus() doesn't work reliably in
-				// IE7)
-				this.tableObj.cells[this.tableObj.cells.length - 1]._selectAll(this.wrapper.get(0));
+				if (Browser.mozilla) {
+					// After the row is inserted, mozilla sets the cursor outside
+					// the Table in weird places.
+					jqEvent.preventDefault();
 
-				jqEvent.stopPropagation();
-				return;
+					// Place focus into first editable cell of new row
+					$(lastInsertedRow).find('td:nth-child(2) .aloha-table-cell-editable').focus();
+				}
 			}
 		}
 	};
@@ -514,7 +528,7 @@ function (jQuery, Utils) {
 
 		// if empty insert a blank space and blur and focus the wrapper
 		if (text === '') {
-			this.wrapper.text('\u00a0');
+			this.wrapper.text('');
 			this.wrapper.get(0).blur();
 			this.wrapper.get(0).focus();
 		}

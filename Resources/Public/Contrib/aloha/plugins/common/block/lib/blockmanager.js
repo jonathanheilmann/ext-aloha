@@ -33,7 +33,8 @@ define([
 	'aloha/registry',
 	'util/class',
 	'util/strings',
-	'util/maps'
+	'util/maps',
+	'block/block-utils'
 ], function (
 	Aloha,
 	$,
@@ -42,13 +43,34 @@ define([
 	Registry,
 	Class,
 	Strings,
-	Maps
+	Maps,
+    BlockUtils
 ) {
 	'use strict';
 
 	var jQuery = $;
 
 	var GENTICS = window.GENTICS;
+
+	/**
+	 * Selects the entire `block` for cut/copy.
+	 * @param {Block} block
+	 */
+	function selectWholeBlockForCopy(block) {
+		block.$element.attr('data-aloha-block-copy-only-block', 'true');
+		GENTICS.Utils.Dom.selectDomNode(block.$element[0]);
+	}
+
+	/**
+	 * Checks if actual range is collapsed.
+	 * @return {boolean}
+	 */
+	function isRangeExpanded() {
+		if (!Aloha.getSelection().getRangeCount()) {
+			return false;
+		}
+		return !Aloha.getSelection().getRangeAt(0).collapsed;
+	}
 
 	/**
 	 * This is the block manager, which is the central entity for maintaining the lifecycle of blocks.
@@ -203,9 +225,15 @@ define([
 				var commandId = data.commandId;
 
 				// Internet Explorer *magically* sets the range to the "Body" object after deselecting everything. yeah :-D
-				var onlyBlockSelected = (Aloha.getSelection().getRangeCount() === 0) || // Firefox / Chrome
-					(Aloha.getSelection().getRangeCount() === 1 && Aloha.getSelection().getRangeAt(0).endContainer === Aloha.getSelection().getRangeAt(0).startContainer && Aloha.getSelection().getRangeAt(0).endContainer === jQuery('body')[0]) || // Internet explorer: Inline Elements
-					(Aloha.getSelection().getRangeCount() === 1 && Aloha.getSelection().getRangeAt(0).endContainer === Aloha.getSelection().getRangeAt(0).startContainer && Aloha.getSelection().getRangeAt(0).startOffset + 1 === Aloha.getSelection().getRangeAt(0).endOffset); // Internet explorer: Block level elements
+				var selection = Aloha.getSelection(),
+				    rangeCount = selection.getRangeCount(),
+				    range = selection.getRangeAt(0),
+				    rangeEndContainer = range.endContainer,
+				    rangeStartContainer = range.startContainer,
+
+				    onlyBlockSelected = (rangeCount === 0) || // Firefox / Chrome
+					       (rangeCount === 1 && rangeEndContainer === rangeStartContainer && rangeEndContainer === jQuery('body')[0]) || // Internet explorer: Inline Elements
+					       (rangeCount === 1 && rangeEndContainer === rangeStartContainer && range.startOffset + 1 === range.endOffset); // Internet explorer: Block level elements
 
 				if (that._activeBlock && (commandId === 'delete' || commandId === 'forwarddelete') && onlyBlockSelected) {
 					// Deletion when a block is currently selected
@@ -213,7 +241,7 @@ define([
 					// In this case, the default command shall not be executed.
 					data.preventDefault = true;
 					that._activeBlock.destroy();
-				} else if (!that._activeBlock && (commandId === 'delete' || commandId === 'forwarddelete') && Aloha.getSelection().getRangeCount() === 1 && Aloha.getSelection().getRangeAt(0).collapsed === false) {
+				} else if (!that._activeBlock && (commandId === 'delete' || commandId === 'forwarddelete') && rangeCount === 1 && range.collapsed === false) {
 					// Deletion when a block is inside a bigger selection currently
 					// In this case, we check if we find an aloha-block. If yes, we delete it right away as the browser does not delete it correctly by default
 					var traverseSelectionTree;
@@ -288,22 +316,26 @@ define([
 					}
 				}
 
-				// IF: Ctrl/Command C pressed -- COPY
-				if (that._activeBlock && (e.ctrlKey || e.metaKey) && e.which === 67) {
-					currentlyCopying = true;
-					//selectionBeforeCopying = new GENTICS.Utils.RangeObject(true);
-					that._activeBlock.$element.attr('data-aloha-block-copy-only-block', 'true');
-					GENTICS.Utils.Dom.selectDomNode(that._activeBlock.$element[0]);
-				}
+				// If the block is a table do not select whole table,
+				// table has its own selection methods.
+				if (that._activeBlock
+					&& (e.ctrlKey || e.metaKey)
+					&& !isRangeExpanded()
+					&& !BlockUtils.isTable(that._activeBlock.$element)) {
 
-				// IF: Ctrl/Command X pressed -- CUT
-				if (that._activeBlock && (e.ctrlKey || e.metaKey) && e.which === 88) {
-					currentlyCutting = true;
-					//selectionBeforeCopying = new GENTICS.Utils.RangeObject(true);
-					that._activeBlock.$element.attr('data-aloha-block-copy-only-block', 'true');
-					GENTICS.Utils.Dom.selectDomNode(that._activeBlock.$element[0]);
+					// IF: Ctrl/Command C pressed -- COPY
+					if (e.which === 67) {
+						currentlyCopying = true;
+						selectWholeBlockForCopy(that._activeBlock);
+					}
+					// IF: Ctrl/Command X pressed -- CUT
+					else if (e.which === 88) {
+						currentlyCutting = true;
+						selectWholeBlockForCopy(that._activeBlock);
+					}
 				}
 			});
+
 			jQuery(window.document).keyup(function (e) {
 				// IF: Release of ctrl / command C
 				if (!currentlyCutting && currentlyCopying && (e.which === 67 || e.which === 18 || e.which === 91)) {
@@ -343,70 +375,13 @@ define([
 		 * drop targets for block-level aloha blocks.
 		 */
 		initializeBlockLevelDragDrop: function () {
-			var that = this;
+			var blockmanager = this;
 			jQuery.each(Aloha.editables, function (i, editable) {
-				editable.obj.data("block-dragdrop", that._dragdropEnabled);
-				that.createBlockLevelSortableForEditableOrBlockCollection(editable.obj);
+				editable.obj.data('block-dragdrop', blockmanager._dragdropEnabled);
 			});
 			Aloha.bind('aloha-editable-created', function (e, editable) {
-				editable.obj.data("block-dragdrop", that._dragdropEnabled);
-				that.createBlockLevelSortableForEditableOrBlockCollection(editable.obj);
+				editable.obj.data('block-dragdrop', blockmanager._dragdropEnabled);
 			});
-		},
-
-		/**
-		 * We make editables or block collections sortable using jQuery UI here, if we
-		 * did not do this before.
-		 *
-		 * This is an internal method a user should never call!
-		 */
-		createBlockLevelSortableForEditableOrBlockCollection: function ($editableOrBlockCollection) {
-			var that = this;
-
-			if (!$editableOrBlockCollection.hasClass('aloha-block-blocklevel-sortable')) {
-
-				// We only want to make "block-level" aloha blocks sortable. According to the docs,
-				// sortable.cancel should have a CSS selector and if this matches, the element is only
-				// a drop target but NOT draggable. However, passing :not(.aloha-block) does not work somehow :-(
-				//
-				// Thus, we implemented the following alternative:
-				// Every "block-level" aloha block drag handle gets a new CSS class, and we only select this as
-				// drag handle. As only "block-level" aloha blocks have this CSS class, this will also only make
-				// aloha blocks draggable.
-				$editableOrBlockCollection.addClass("aloha-block-blocklevel-sortable").sortable({
-					revert: 100,
-					handle: ".aloha-block-draghandle-blocklevel",
-					connectWith: ".aloha-block-blocklevel-sortable.aloha-block-dropzone", // we want to be able to drag an element to other editables
-					disabled: !that._dragdropEnabled, // if drag & drop is disabled, sortable should also be disabled
-					start: function (event, ui) {
-						// check if the block's parent is a dropzone
-						ui.item.data("block-sort-allowed", (ui.item.parents(".aloha-block-dropzone").length > 0));
-					},
-					change: function (event, ui) {
-						ui.item.data("block-sort-allowed", (ui.placeholder.parents(".aloha-block-dropzone").length > 0));
-					},
-					stop: function (event, ui) { 
-						if (!ui.item.data("block-sort-allowed")) {
-							jQuery(this).sortable("cancel");
-						} 
-						ui.item.removeData("block-sort-allowed");
-					}
-				});
-
-				// Hack for Internet Explorer 8:
-				// If you first click inside an editable, and THEN want to drag a block-level block,
-				// it sometimes occurs that the *whole editable* is selected and should be dragged away.
-				// This breaks dragging of Aloha Blocks.
-				// Bugfix: We disable the "ondragstart" event on every editable.
-				// However, as the "ondragstart" is also fired when a nested (inline) editable is moved using drag/drop,
-				// we need to allow this case.
-				$editableOrBlockCollection.get(0).ondragstart = function (e, ui) {
-					if (!ui || !ui.helper || !ui.helper.is('.aloha-block')) {
-						// You tried to move something else than an aloha block
-						return false;
-					}
-				};
-			}
 		},
 
 		/**
@@ -501,26 +476,41 @@ define([
 		/**
 		 * Merges the config from different places, and return the merged config.
 		 *
+		 * @param {Object} jQuery Object
+		 * @param {Object} default configuration
+		 *
 		 * @private
 		 */
 		getConfig: function (blockElement, instanceDefaults) {
-			// Clone the element before getting the data to fix an IE7 crash.
-			// We use jQuery.clone(true) because the sortableItem attribute isn't returned
-			// if we do a normal cloneNode(...).
-			var clone = blockElement.clone(true);
-			var dataCamelCase = clone.data();
-			var data = {};
-			clone.removeData();
-			// jQuery.data() returns data attributes with names like
-			// data-some-attr as dataSomeAttr which has to be reversed
-			// so that they can be merged with this.defaults and
-			// instanceDefaults which are expected to be in
-			// data-some-attr form.
-			for (var key in dataCamelCase) {
-				if (dataCamelCase.hasOwnProperty(key)) {
-					data[Strings.camelCaseToDashes(key)] = dataCamelCase[key];
+			var
+				data          = {},
+				dataCamelCase = null,
+				$clone        = null;
+
+			if (blockElement.length > 0) {
+				// Clone the element before getting the data to fix an IE7 crash.
+				// We use the native cloneNode function, because jQuerys clone()
+				// executes scripts also, what we don't want.
+				// But since that one doesn't copy the the abritary jQuery data, we
+				// manually merge both datas together into a new object.
+				$clone = $(blockElement[0].cloneNode(false));
+				// Merge the "data-" attributes from the clone and take the
+				// arbitrary data from the original jQuery object
+				dataCamelCase = $.extend({}, $.data(blockElement[0]), $clone.data());
+				$clone.removeData();
+
+				// jQuery.data() returns data attributes with names like
+				// data-some-attr as dataSomeAttr which has to be reversed
+				// so that they can be merged with this.defaults and
+				// instanceDefaults which are expected to be in
+				// data-some-attr form.
+				for (var key in dataCamelCase) {
+					if (dataCamelCase.hasOwnProperty(key)) {
+						data[Strings.camelCaseToDashes(key)] = dataCamelCase[key];
+					}
 				}
 			}
+
 			return jQuery.extend(
 				{},
 				this.defaults,

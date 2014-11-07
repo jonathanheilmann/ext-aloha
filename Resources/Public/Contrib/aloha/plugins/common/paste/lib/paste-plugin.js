@@ -38,7 +38,8 @@ define([
 	'contenthandler/contenthandler-utils',
 	'aloha/console',
 	'aloha/copypaste',
-	'util/dom'
+	'aloha/contenthandlermanager',
+	'util/browser'
 ], function (
 	$,
 	Aloha,
@@ -47,7 +48,8 @@ define([
 	ContentHandlerUtils,
 	Console,
 	CopyPaste,
-	Dom
+	ContentHandlerManager,
+	Browser
 ) {
 	'use strict';
 
@@ -65,7 +67,7 @@ define([
 	 * @type {boolean}
 	 * @const
 	 */
-	var IS_IE = !!$.browser.msie;
+	var IS_IE = !!Aloha.browser.msie;
 
 	/**
 	 * Matches as string consisting of a single white space character.
@@ -79,20 +81,6 @@ define([
 	var PROPPING_SPACE = /^(\s|%A0)$/;
 
 	/**
-	 * An container for the $CLIPBOARD element. The $CLIPBOARD it's need to be
-	 * wrapped in this container if not, in some browser the generated elements
-	 * inherits the styles used to hide the element
-	 *
-	 * @type {jQuery.<HTMLElement>}
-	 * @const
-	 */
-	var $CLIPBOARD_CONTAINER = $('<div class="aloha-paste-handler" style="position:absolute; ' +
-					   'clip:rect(0px,0px,0px,0px); width:1px; height:1px;' +
-//					   'right: 1%; top: 10px; width: 40%; min-height; 120px;' +
-//					   ' background: white; ' + // uncomment these line in debug
-					   '"><div class="aloha-metaview"></div></div>');
-
-	/**
 	 * An invisible editable element used to intercept incoming pasted content
 	 * so that it can be processed before being placed into real editables.
 	 *
@@ -102,7 +90,9 @@ define([
 	 * @type {jQuery.<HTMLElement>}
 	 * @const
 	 */
-	var $CLIPBOARD = $('div', $CLIPBOARD_CONTAINER).contentEditable(true);
+	var $CLIPBOARD = $('<div style="position:absolute; ' +
+	                   'clip:rect(0px,0px,0px,0px); ' +
+	                   'width:1px; height:1px;"></div>').contentEditable(true);
 
 	/**
 	 * Stored range, use to accomplish IE hack.
@@ -125,7 +115,7 @@ define([
 	};
 
 	/**
-	 * Set the selection to the given range and focus on the editable inwhich
+	 * Set the selection to the given range and focus on the editable in which
 	 * the selection is in (if any).
 	 *
 	 * This function is used to restore the selection to what it was before
@@ -143,20 +133,6 @@ define([
 			scrollPositionBeforePaste.x,
 			scrollPositionBeforePaste.y
 		);
-	}
-
-	/**
-	 * Prepares the clipboard object to get the contents of clipboard.
-	 * Basicly empty the object and add a Paragraph element.
-	 *
-	 * @param {jQuery.<HTMLElement>} $target Target to be cleaned
-	 * @return {jQuery.<HTMLElement>}
-	 */
-	function prepareClipboardHelper($target) {
-		var $newTarget = $('<p>');
-		$target.contents().remove();
-		$target.append($newTarget);
-		return $newTarget;
 	}
 
 	/**
@@ -179,7 +155,12 @@ define([
 		// Because moving the target element to the current scroll position
 		// avoids jittering the viewport when the pasted content moves between
 		// where the range is and target.
-		$target = prepareClipboardHelper($target);
+		$target.css({
+			top: $WINDOW.scrollTop(),
+			left: $WINDOW.scrollLeft() - width,
+			width: width,
+			overflow: 'hidden'
+		}).contents().remove();
 
 		var from = CopyPaste.getEditableAt(range);
 		if (from) {
@@ -261,6 +242,50 @@ define([
 	}
 
 	/**
+	 * Delete the first match in a string
+	 *
+	 * @param {String} string String to modify
+	 * @param {String} match Match string must be replaced
+	 * @returns {string} Original string with the first match replaced.
+	 */
+	function deleteFirstMatch(string, match) {
+		return string.replace(match, '');
+	}
+
+	/**
+	 * Delete the first Header tag if exists.
+	 *
+	 * @param htmlString
+	 * @returns {XML|string}
+	 */
+	function deleteFirstHeaderTag(htmlString) {
+		var matchFirstHeaderTag = /^<h\d+.*?>/i.exec(htmlString),
+		    startHeaderTag,
+		    endHeaderTag;
+
+		if (matchFirstHeaderTag === null) {
+			return htmlString;
+		}
+
+		startHeaderTag = matchFirstHeaderTag[0];
+		endHeaderTag = '</' + startHeaderTag.substr(1);
+
+		return deleteFirstMatch(
+			deleteFirstMatch(htmlString, startHeaderTag),
+			endHeaderTag
+		);
+	}
+
+	/**
+	 * Checks if browser and document mode are 9 or above versions.
+	 * @param  {Document} doc
+	 * @return {boolean}
+	 */
+	function isIEorDocModeGreater9(doc) {
+		return Browser.ie && doc.documentMode >= 9;
+	}
+
+	/**
 	 * Gets the pasted content and inserts them into the current active
 	 * editable.
 	 *
@@ -275,68 +300,36 @@ define([
 	 *                             pasting is completed.
 	 */
 	function paste($clipboard, range, callback) {
-		if (range) {
-			if ($.browser.mozilla) {
-
-				$('br', $clipboard).each(function () {
-					if (
-						this.parentNode
-							&& this.previousSibling
-							&& this.previousSibling.nodeType === 3
-							&& this.nextSibling
-							&& this.nextSibling.nodeType === 1
-							&& this.nextSibling.nodeName === 'BR'
-					) {
-						var newParent = document.createElement(this.parentNode.nodeName);
-						newParent.appendChild(this.previousSibling);
-						$(this.parentNode).before(newParent);
-						$([this, this.nextSibling]).remove();
-					}
-				});
-
-				$('>span', $clipboard).each(function () {
-					var span = $(this),
-						p = $('<p>').append(span.contents());
-					span.replaceWith(p);
-				});
-
-			}
-			// cleans empty paragraphs needed in webkit mostly
-			$('p', $clipboard).each(function () {
-				var p = $(this),
-					contents = p.contents();
-
-				if (Dom.isEmpty(this) || (
-						contents.length === 1
-						&& contents[0].nodeName === 'BR'
-					)) {
-					p.remove();
-				}
-			});
-
-			var content = $clipboard.html();
-
-			// Because IE inserts an insidious nbsp into the content during
-			// pasting that needs to be removed.  Leaving it would otherwise
-			// result in an empty paragraph being created right before the
-			// pasted content when the pasted content is a paragraph.
-			if (IS_IE && (/^&nbsp;/).test(content)) {
-				content = content.substring(6);
-			}
-
-			restoreSelection(range);
-			prepRangeForPaste(range);
-
-			if (Aloha.queryCommandSupported('insertHTML')) {
-				Aloha.execCommand('insertHTML', false, content);
-			} else {
-				Console.error('Common.Paste', 'Command "insertHTML" not ' +
-				                              'available. Enable the plugin ' +
-				                              '"common/commands".');
-			}
+		if (!range) {
+			return;
 		}
 
-		prepareClipboardHelper($clipboard);
+		var content = deleteFirstHeaderTag($clipboard.html());
+		var handler = ContentHandlerManager.get('formatless');
+
+		content = handler ? handler.handleContent(content) : content;
+
+		// Because IE inserts an insidious nbsp into the content during pasting
+		// that needs to be removed.  Leaving it would otherwise result in an
+		// empty paragraph being created right before the pasted content when
+		// the pasted content is a paragraph.
+		if (IS_IE && /^&nbsp;/.test(content)) {
+			content = content.substring(6);
+		}
+
+		restoreSelection(range);
+		prepRangeForPaste(range);
+
+		if (Aloha.queryCommandSupported('insertHTML')) {
+			Aloha.execCommand('insertHTML', false, content);
+		} else {
+			Console.error(
+				'Common.Paste',
+				'Command "insertHTML" not available. Enable the plugin "common/commands".'
+			);
+		}
+
+		$clipboard.contents().remove();
 
 		if (typeof callback === 'function') {
 			callback();
@@ -380,13 +373,14 @@ define([
 	 *
 	 * @param {jQuery.<HTMLElement>} $editable jQuery object containing an
 	 *                                         editable DOM element.
-	 * @param {boolean} hasClipboardAccess Whether clipboard access is possible.
 	 */
-	function prepare($editable, hasClipboardAccess) {
-		// FIXME: Because the alternative method, which relies on clipboard
-		//        access, leads to incorrect cursor positions after pasting.
-		// if (IS_IE && !hasClipboardAccess) {
-		if (IS_IE) {
+	function prepare($editable) {
+		// Clipboard in IE can no be used, because it does not return HTML content, just text
+		// (http://msdn.microsoft.com/en-us/library/ie/ms536436(v=vs.85).aspx).
+		// We relay on range.execCommand('paste') for the paste, but for IE9 and above the pasted content
+		// is treated differently (it replaces '\n' by '<br>').
+		var doc = $editable[0].ownerDocument;
+		if (isIEorDocModeGreater9(doc)) {
 			$editable.bind('beforepaste', function ($event) {
 				scrollPositionBeforePaste.x = window.scrollX ||
 					document.documentElement.scrollLeft;
@@ -407,6 +401,7 @@ define([
 				var range = CopyPaste.getRange();
 				redirect(range, $CLIPBOARD);
 				if (IS_IE) {
+					$event.preventDefault();
 					var tmpRange = document.selection.createRange();
 					tmpRange.execCommand('paste');
 				}
@@ -415,23 +410,20 @@ define([
 		}
 	}
 
-	var plugin = Plugin.create('paste', {
+	return Plugin.create('paste', {
 
 		settings: {},
 
 		init: function () {
-			$('body').append($CLIPBOARD_CONTAINER);
-
-			var hasClipboardAccess = !this.settings.noclipboardaccess;
+			$('body').append($CLIPBOARD);
 
 			Aloha.bind('aloha-editable-created', function ($event, editable) {
-				prepare(editable.obj, hasClipboardAccess);
+				prepare(editable.obj);
 			});
 
-			// Bind a handler to the paste event of the pasteDiv to get the
-			// pasted content (but do this only once, not for every editable)
-			// if (IS_IE && !hasClipboardAccess) {
-			if (IS_IE) {
+			if (isIEorDocModeGreater9($CLIPBOARD[0].ownerDocument)) {
+				// Bind a handler to the paste event of the pasteDiv to get the
+				// pasted content (but do this only once, not for every editable)
 				$CLIPBOARD.bind('paste', function ($event) {
 					onPaste($event, ieRangeBeforePaste, function () {
 						ieRangeBeforePaste = null;
@@ -452,6 +444,4 @@ define([
 			                                    'instead.');
 		}
 	});
-
-	return plugin;
 });

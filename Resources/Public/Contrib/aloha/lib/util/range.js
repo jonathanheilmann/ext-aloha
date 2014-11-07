@@ -61,6 +61,32 @@ define([
 	}
 
 	/**
+	 * Find tag with tag name 'TagName' by recursion in the RangeTree
+	 * of a Range Selection
+	 *
+	 * @param {RangeTree []} array Range Tree class
+	 * @param {String} tagName Element Tag Name
+	 * @param {DOMObject []} objs arrays containing the elements whidh Tag Name
+	 * is 'tagName'
+	 */
+	function findTagInRangeTreeRecursion(array, tagName, objs) {
+		var element,
+			i,
+			len = array.length;
+		for (i = 0; i < len; i++) {
+			element = array[i];
+			if (element.type !== 'none' && element.type !== 'collapsed') {
+				if (element.domobj.nodeName === tagName) {
+					objs.push(element.domobj);
+				}
+				if (element.children.length > 0) {
+					findTagInRangeTreeRecursion(element.children, tagName, objs);
+				}
+			}
+		}
+	}
+
+	/**
 	 * @namespace GENTICS.Utils
 	 * @class RangeObject
 	 * Represents a selection range in the browser that
@@ -323,7 +349,16 @@ define([
 
 			// update the selection
 			sel = rangy.getSelection();
-			sel.setSingleRange(range);
+			// Selection type 'Control' (elements selected), 'Text' (text selected), 'None' (nothing selected) 
+			// (http://help.dottoro.com/ljitmswc.php)
+			// If the selection is 'Text' or 'Control' and the range is collapsed then there is nothing selected, and 
+			// this can produce a Javascript Error only in IE. (Reproducible: Just by dragging and drop block elements)
+			// catching the exception so the execution can continue
+			try {
+				sel.setSingleRange(range);
+			} catch (e) {
+				console.warn(e);
+			}
 		},
 
 		/**
@@ -510,7 +545,7 @@ define([
 					adjacentTextNode = GENTICS.Utils.Dom.searchAdjacentTextNode(this.startContainer.parentNode, GENTICS.Utils.Dom.getIndexInParent(this.startContainer), true);
 					//only move the selection if the adjacentTextNode is inside the current editable
 					//the cursor should not be outside the editable
-					if (adjacentTextNode && jQuery(adjacentTextNode).closest(Aloha.activeEditable.obj).length > 0) {
+					if (adjacentTextNode && Aloha.activeEditable && jQuery(adjacentTextNode).closest(Aloha.activeEditable.obj).length > 0) {
 						this.startContainer = this.endContainer = adjacentTextNode;
 						this.startOffset = this.endOffset = adjacentTextNode.data.length;
 					}
@@ -837,6 +872,23 @@ define([
 			}
 			return false;
 		},
+
+		/**
+		 * Find all markups by Tag name
+		 *
+		 * @param {String} tagName Tag name
+		 * @param {Range Object} range Selection Range
+		 * @returns {DOMObject[]} All DOM objects matching the tag Name
+		 */
+		findAllMarkupByTagName: function (tagName, range) {
+			var rangeTree = range.getRangeTree(),
+				objs = [];
+			tagName = tagName.toUpperCase();
+
+			findTagInRangeTreeRecursion(rangeTree, tagName, objs);
+			return objs;
+		},
+
 
 		/**
 		 * Get the text enclosed by this range

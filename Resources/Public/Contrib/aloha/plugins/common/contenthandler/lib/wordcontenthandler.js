@@ -29,19 +29,15 @@ define([
 	'aloha',
 	'aloha/contenthandlermanager',
 	'contenthandler/contenthandler-utils',
-	'util/dom',
 	'util/dom2',
-	'util/arrays',
-	'util/strings'
+	'util/html'
 ], function (
 	$,
 	Aloha,
 	Manager,
 	Utils,
-	Dom,
 	Dom2,
-	Arrays,
-	Strings
+    Html
 ) {
 	'use strict';
 
@@ -62,12 +58,6 @@ define([
 	 * @const
 	 */
 	var HASH_HREF = /^#(.*)/;
-
-	/**
-	 * CSS styles we want to preserve.
-	 * Can be overridden with Aloha.settings.contentHandler.word.preserveStyles.
-	 */
-	var preserveStylesDefault = ['font-family', 'font-size', 'color', 'background-color'];
 
 	/**
 	 * Checks whether the given node is empty, ignoring white spaces.
@@ -122,28 +112,19 @@ define([
 	}
 
 	/**
-	 * Return a new span element, copying some preservable properties
-	 * over from the given span element. If there are no preservable
-	 * properties, return null.
+	 * Removes unrendered child nodes from `$content`.
+	 * @param {jQuery.<HTMLElement> $content
 	 */
-	function cleanSpan(elem) {
-		var clean = null;
-		var preserveStyles = ((Aloha.settings
-							   && Aloha.settings.contentHandler
-							   && Aloha.settings.contentHandler.word
-							   && Aloha.settings.contentHandler.word.preserveStyles)
-							  || preserveStylesDefault);
-		Arrays.forEach(preserveStyles, function (styleName) {
-			var styleValue = Dom2.getStyle(elem, styleName);
-			if (Strings.empty(styleValue)) {
-				return;
+	function removeUnrenderedChildNodes($content) {
+		var childNodes = $content[0].childNodes;
+		var i;
+		var len;
+
+		for (i = 0, len = childNodes.length; i < len; i++) {
+			if (childNodes[i] && Html.isUnrenderedNode(childNodes[i])) {
+				$content[0].removeChild(childNodes[i]);
 			}
-			if (!clean) {
-				clean = elem.ownerDocument.createElement('SPAN');
-			}
-			Dom2.setStyle(clean, styleName, styleValue);
-		});
-		return clean;
+		}
 	}
 
 	/**
@@ -157,7 +138,9 @@ define([
 		var $node;
 		var href;
 		var i;
-		for (i = 0; i < $nodes.length; i++) {
+		var len;
+
+		for (i = 0, len = $nodes.length; i < len; i++) {
 			$node = $nodes.eq(i);
 			nodeName = $node[0].nodeName.toLowerCase();
 
@@ -169,18 +152,11 @@ define([
 				if (href && HASH_HREF.test($.trim(href))) {
 					$node.contents().unwrap();
 				}
-			} else if ('div' === nodeName) {
+			} else if ('div' === nodeName || 'span' === nodeName) {
 
 				// Because footnotes for example are wrapped in divs and should
-				// be unwrapped.
+				// be unwrap.
 				$node.contents().unwrap();
-			} else if ('span' === nodeName) {
-				var cleanElem = cleanSpan($node[0]);
-				if (cleanElem) {
-					Dom2.replaceShallow($node[0], cleanElem);
-				} else {
-					Dom2.removeShallow($node[0]);
-				}
 			} else if ('td' !== nodeName && isEmpty($node)) {
 
 				// Because any empty element (like spaces wrapped in spans) are
@@ -188,6 +164,8 @@ define([
 				$node.contents().unwrap();
 			}
 		}
+
+		removeUnrenderedChildNodes($content);
 	}
 
 	/**
@@ -231,13 +209,13 @@ define([
 		 * @param listSpan
 		 * @return true for ordered lists, false for unordered
 		 */
-		isOrderedList: function(listSpan) {
+		isOrderedList: function (listSpan) {
 			// when the span has fontFamily "Wingdings" it is an unordered list
 			if (listSpan.css('fontFamily') == 'Wingdings' || listSpan.css('fontFamily') == 'Symbol') {
 				return false;
 			}
 			// otherwise check for a number, letter or '(' as first character
-			return listSpan.text().match(/^([0-9]{1,3}\.)|([0-9]{1,3}\)|([a-zA-Z]{1,5}\.)|([a-zA-Z]{1,5}\)))$/) ? true : false;
+			return $.trim(listSpan.text()).match(/^([0-9]{1,3}\.)|([0-9]{1,3}\)|([a-zA-Z]{1,5}\.)|([a-zA-Z]{1,5}\)))$/) ? true : false;
 		},
 
 		/**
@@ -256,7 +234,7 @@ define([
 			// first step is to find all paragraphs which will be converted into list elements and mark them by adding the class 'aloha-list-element'
 			detectionFilter = 'p.MsoListParagraphCxSpFirst,p.MsoListParagraphCxSpMiddle,p.MsoListParagraphCxSpLast,p.MsoListParagraph,p span';
 			paragraphs = content.find(detectionFilter);
-			paragraphs.each(function() {
+			paragraphs.each(function () {
 				var jqElem = jQuery(this),
 					fontFamily = jqElem.css('font-family') || '',
 					msoList = jqElem.css('mso-list') || '',
@@ -279,7 +257,7 @@ define([
 			// now we search for paragraphs with three levels of nested spans, where the innermost span contains nothing but &nbsp;
 			detectionFilter = 'p span span span';
 			spans = content.find(detectionFilter);
-			spans.each(function() {
+			spans.each(function () {
 				var jqElem = jQuery(this),
 				    innerText = jQuery.trim(jqElem.text()).replace(/&nbsp;/g, ''),
 					outerText;
@@ -311,13 +289,13 @@ define([
 			paragraphs = content.find(detectionFilter);
 
 			if (paragraphs.length > 0) {
-				paragraphs.each(function() {
+				paragraphs.each(function () {
 					var jqElem = jQuery(this),
 						jqNewLi, jqList, ordered, firstSpan, following, lists, margin, nestLevel;
 
 					jqElem.removeClass(listElementClass);
 					// first remove all font tags
-					jqElem.find('font').each(function() {
+					jqElem.find('font').each(function () {
 						jQuery(this).contents().unwrap();
 					});
 
@@ -358,7 +336,7 @@ define([
 					jqElem.replaceWith(jqList);
 
 					// now proceed all following list elements
-					following.each(function() {
+					following.each(function () {
 						var jqElem = jQuery(this),
 							newMargin, jqNewList;
 						
@@ -368,7 +346,7 @@ define([
 						}
 
 						// remove all font tags
-						jqElem.find('font').each(function() {
+						jqElem.find('font').each(function () {
 							jQuery(this).contents().unwrap();
 						});
 						// check the new margin
@@ -428,25 +406,25 @@ define([
 		 * Remove paragraph numbering from TOC feature
 		 * @param content
 		*/
-		removeParagraphNumbering: function( content ) {
+		removeParagraphNumbering: function ( content ) {
 			var detectionFilter = 'h1,h2,h3,h4,h5,h6',
 				paragraphs = content.find(detectionFilter);
 			
 			if (paragraphs.length > 0) {
-				paragraphs.each(function() {
+				paragraphs.each(function () {
 					var jqElem = jQuery(this),
 						spans = jqElem.find('span'),
 						links = jqElem.find('a');
 				
 					// remove TOC numbering
-					spans.each(function() {
+					spans.each(function () {
 						if ( jQuery.trim(jQuery(this).text()).match(/^([\.\(]?[\d\D][\.\(]?){1,4}$/) ) {
 							jQuery(this).remove();
 						}
-					})
+					});
 				
 					// remove TOC anchor links
-					links.each(function() {
+					links.each(function () {
 						// no href, so it's an anchor
 						if ( typeof jQuery(this).attr('href') === 'undefined' ) {
 							jQuery(this).contents().unwrap();
@@ -462,11 +440,11 @@ define([
 		 * Transform TOC
 		 * @param content
 		*/
-		transformToc: function( content ) {
+		transformToc: function ( content ) {
 			var detectionFilter = '[class*=MsoToc]',
 				paragraphs = content.find(detectionFilter);
 
-			paragraphs.each(function() {
+			paragraphs.each(function () {
 				var jqElem = jQuery(this),
 					spans = jqElem.find('span'),
 					links = jqElem.find('a');
@@ -474,7 +452,7 @@ define([
 				// a table of contents entry looks like
 				// 1. Title text ... 5
 				// we get rid of the "... 5" part which repesents the page number
-				spans.each(function() {
+				spans.each(function () {
 					if ( jQuery(this).attr('style') && jQuery(this).attr('style').search('mso-hide') > -1 ) {
 						jQuery(this).remove();
 					}
@@ -482,7 +460,7 @@ define([
 				});
 
 				// remove the anchor link of the toc item
-				links.each(function() {
+				links.each(function () {
 					jQuery(this).contents().unwrap();
 				});
 			});

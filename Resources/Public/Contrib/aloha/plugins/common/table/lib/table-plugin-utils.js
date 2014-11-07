@@ -1,5 +1,41 @@
-define(['jquery'], function ($) {
+define([
+	'jquery',
+	'aloha/copypaste',
+	'util/browser',
+	'aloha/console'
+], function (
+	$,
+	CopyPaste,
+	Browser,
+	Console
+) {
 	'use strict';
+
+	function getAnchorCell(cells) {
+		if (0 === cells.length) {
+			return null;
+		}
+
+		var i;
+		var editable;
+		var range = CopyPaste.getRange();
+
+		if (range) {
+			editable = $(
+				range.commonAncestorContainer
+			).closest('.aloha-table-cell-editable')[0];
+		}
+
+		if (editable) {
+			for (i = 0; i < cells.length; i++) {
+				if ($(cells[i]).find(editable).length) {
+					return cells[i];
+				}
+			}
+		}
+
+		return cells[0];
+	}
 
 	var Utils = {
 		/**
@@ -222,10 +258,12 @@ define(['jquery'], function ($) {
 		 *        If the callback returns a value identical to false,
 		 *        the walk will be aborted early.
 		 */
-		'walkGrid': function (grid, callback) {
-			for ( var i = 0; i < grid.length; i++ ) {
-				for ( var j = 0; j < grid[i].length; j++ ) {
-					if ( false === callback( grid[ i ][ j ], j, i ) ) {
+		'walkGrid': function(grid, callback) {
+			var	row;
+			for (var i = 0, gridLength = grid.length; i < gridLength; i++ ) {
+				row = grid[i];
+				for (var j = 0, rowLength = row.length; j < rowLength; j++ ) {
+					if ( false === callback( row[ j ], j, i ) ) {
 						return;
 					}
 				}
@@ -355,14 +393,14 @@ define(['jquery'], function ($) {
 		/**
 		 * resizes the width of the given cell
 		 *
-		 * @param cell
+		 * @param {DOM element} cell
 		 *        the DOM node for a table cell (td/th)
-		 * @param
+		 * @param {number | string} width
 		 *        an integer value indicating the desired width
 		 */
 
 		'resizeCellWidth': function(cell, width) {
-			$( cell ).css( 'width', width );
+			$( cell ).css('width', width);
 			$( cell ).find('.aloha-table-cell-editable').eq(0).css({
 				'width': width,
 				'word-wrap': 'break-word'
@@ -486,6 +524,22 @@ define(['jquery'], function ($) {
 		 */
 		'getCellPadding': function(cell) {
 			return ( cell.innerWidth() - cell.width() );
+		},
+
+		selectAnchorContents: function(selection) {
+			var anchor = getAnchorCell(selection);
+			if (anchor) {
+				var element = $('>.aloha-table-cell-editable', anchor)[0];
+				if (Browser.ie && anchor.ownerDocument.documentMode <= 8) {
+					try {
+						CopyPaste.selectAllOf(element);
+					} catch (e) {
+						Console.warn('Table Plugin', e.message);
+					}
+				} else {
+					CopyPaste.selectAllOf(element);
+				}
+			}
 		}
 
 	};

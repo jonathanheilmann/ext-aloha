@@ -51,6 +51,7 @@ function (jQuery, Component, Utils) {
 						at: 'right bottom'
 					}
 				})
+				.zIndex(0)    // fix for IE7,8 so the icon shown disabled
 				.click(jQuery.proxy(function () {
 
 					// Ensure tooltips are always hidden after a button
@@ -59,10 +60,15 @@ function (jQuery, Component, Utils) {
 					// cells are merged or split.
 					// IE needs the force argument to be true, Chrome doesn't.
 					// The event argument can be ignored.
-					this.buttonElement.tooltip('close', null/*event*/, true/*force*/);
+					this.closeTooltip();
 
 					this._onClick();
 				}, this));
+		},
+
+		closeTooltip: function () {
+			// 'close', /*event*/, /*force*/
+			this.buttonElement.tooltip('close', null, true);
 		},
 
 		/**
@@ -88,24 +94,31 @@ function (jQuery, Component, Utils) {
 		 */
 		createButtonElement: function () {
 			var button = Utils.makeButtonElement();
+
 			if (this['class']) {
 				button.addClass(this['class']);
 			}
 			this.element = this.buttonElement = button;
+
+			var that = this;
+			button.bind('mouseleave', function () {
+				that.closeTooltip();
+			});
+
 			return button;
 		},
 
 		/**
 		 * Shows the button in a greyed-out inactive (unclickable) state.
 		 */
-		disable: function() {
+		disable: function () {
 			this.element.button('option', 'disabled', false);
 		},
 
 		/**
 		 * Enables the button again after it has previously been disabled.
 		 */
-		enable: function(enable_opt) {
+		enable: function (enable_opt) {
 			this.element.button('option', 'disabled', enable_opt === false);
 		}
 	});

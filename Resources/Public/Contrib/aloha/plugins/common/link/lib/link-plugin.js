@@ -1,28 +1,9 @@
-/* link-plugin.js is part of Aloha Editor project http://aloha-editor.org
+/* link-plugin.js is part of the Aloha Editor project http://aloha-editor.org
  *
  * Aloha Editor is a WYSIWYG HTML5 inline editing library and editor. 
- * Copyright (c) 2010-2013 Gentics Software GmbH, Vienna, Austria.
+ * Copyright (c) 2010-2014 Gentics Software GmbH, Vienna, Austria.
  * Contributors http://aloha-editor.org/contribution.php 
- * 
- * Aloha Editor is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or any later version.
- *
- * Aloha Editor is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
- * 
- * As an additional permission to the GNU GPL version 2, you may distribute
- * non-source (e.g., minimized or compacted) forms of the Aloha-Editor
- * source code without the copy of the GNU GPL normally required,
- * provided you include this license notice and a URL through which
- * recipients can access the Corresponding Source.
+ * License http://aloha-editor.org/license.php
  */
 /* Aloha Link Plugin
  * -----------------
@@ -32,45 +13,120 @@
  * Clicking on any links inside the editable activates the this plugin's
  * floating menu scope.
  */
-define( [
+define([
+	'jquery',
 	'aloha',
 	'aloha/plugin',
 	'aloha/ephemera',
-	'jquery',
+	'aloha/content-rules',
+	'util/dom',
 	'ui/port-helper-attribute-field',
 	'ui/ui',
 	'ui/scopes',
-	'ui/surface',
 	'ui/button',
 	'ui/toggleButton',
 	'i18n!link/nls/i18n',
-	'i18n!aloha/nls/i18n',
-	'aloha/console',
 	'PubSub',
-	'util/keys'
+	'util/keys',
+	'../../../shared/languages/languages'
 ], function (
+	$,
 	Aloha,
 	Plugin,
 	Ephemera,
-	jQuery,
+	ContentRules,
+	Dom,
 	AttributeField,
 	Ui,
 	Scopes,
-	Surface,
 	Button,
 	ToggleButton,
 	i18n,
-	i18nCore,
-	console,
 	PubSub,
-	Keys
+	Keys,
+	LanguageRepository
 ) {
 	'use strict';
+
+	var configurations = {};
+	var jQuery = $;
+	var pluginNamespace = 'aloha-link';
+	var oldValue = '';
+	var newValue;
+
+	/**
+	 * Regular expression that matches if an URL is an external link.
+	 */
+	var EXTERNAL_LINK_REG_EXP = /^([a-z]){3,10}:\/\/.+/i;
 	
-	var GENTICS = window.GENTICS,
-	    pluginNamespace = 'aloha-link',
-	    oldValue = '',
-	    newValue;
+	/**
+	 * Field for hrefLang value in the link sidebar.
+	 */
+	var hrefLangField;
+	
+	/**
+	 * Language repository
+	 */
+	var LANG_REPOSITORY;
+	
+	/**
+	 * Initializes href lang input text.
+	 */
+	function initHrefLang(plugin, sidebar) {
+		hrefLangField = AttributeField({
+			name: 'hreflangfield',
+			valueField: 'id',
+			minChars: 1,
+			scope: 'Aloha.continuoustext',
+			open: function (elm, ui) {
+				// known issue http://bugs.jquery.com/ticket/10079
+				// $.css('z-index') return 1e+9, and when call partseInt, then 
+				// parseInt($.css('z-index'), 10) returns 1.
+				// Only firefox issue
+				// Everytime is open the autocomple the z-index must be set,
+				// because is automatically changed. 
+				if (Aloha.browser.mozilla) {
+					hrefLangField.getInputJQuery().autocomplete('widget').css('z-index', '9999999999');
+				}
+			}
+		});
+		
+		if (plugin.flags) {
+			hrefLangField.setTemplate(
+				 '<div class="aloha-wai-lang-img-item">' +
+				  '<img class="aloha-wai-lang-img" src="{url}" />' +
+				  '<div class="aloha-wai-lang-label-item">{name} ({id})</div>' +
+				  '</div>');
+		} else {
+			hrefLangField.setTemplate('<div class="aloha-wai-lang-img-item">' +
+				  '<div class="aloha-wai-lang-label-item">{name} ({id})</div>' +
+				  '</div>'
+			);
+		}
+		
+		hrefLangField.setObjectTypeFilter(['language/link']);
+		
+		hrefLangField.addListener('item-change', function() {
+			if (this.getItem()) {
+				jQuery(sidebar.effective ).attr( 'hreflang', this.getItem().id);
+			}
+		});
+		
+		hrefLangField.addListener('keyup', function() {
+			if (jQuery.trim(this.getValue()).length === 0) {
+				this.setValue('');
+				jQuery(sidebar.effective ).attr( 'hreflang', '');
+			}
+		});
+	}
+	
+	/**
+	 * Gets the language name for laguage code 'langCode'.
+	 * @param {string} langCode Language code
+	 */
+	function getLanguageName(langCode) {
+		return LANG_REPOSITORY.languageData ? LANG_REPOSITORY.languageData[langCode].name : langCode;
+	}
 
 	/**
 	 * Properties for cleaning up markup immediately after inserting new link
@@ -85,16 +141,15 @@ define( [
 	var insertLinkPostCleanup = {
 		merge: true,
 		mergeable: function (node) {
-			return ('aloha-new-link' === node.className && node.nextSibling
-			     && 'aloha-new-link' === node.nextSibling.className);
+			return ('aloha-new-link' === node.className && node.nextSibling &&
+				'aloha-new-link' === node.nextSibling.className);
 		}
 	};
 	
-	Ephemera.classes('aloha-link-pointer', 'aloha-link-text', 'aloha-focus');
+	Ephemera.classes('aloha-link-pointer', 'aloha-link-text');
 
 	function setupMousePointerFix() {
-		jQuery(document)
-			.bind('keydown.aloha-link.pointer-fix', function (e) {
+		jQuery(document).bind('keydown.aloha-link.pointer-fix', function (e) {
 				// metaKey for OSX, 17 for PC (we can't check
 				// e.ctrlKey because it's only set on keyup or
 				// keypress, not on keydown).
@@ -215,7 +270,12 @@ define( [
 		hrefValue: 'http://',
 		
 		/**
-		 * Initialize the plugin
+		 * Shows the flags when setting language ('hreflang' attribute).
+		 */
+		flags: true,
+		
+		/**
+		 * Initializes the plugin.
 		 */
 		init: function () {
 			var plugin = this;
@@ -226,28 +286,28 @@ define( [
 			if ('undefined' !== typeof this.settings.titleregex) {
 				this.titleregex = this.settings.titleregex;
 			}
-			if ( typeof this.settings.targetregex != 'undefined' ) {
+			if (typeof this.settings.targetregex != 'undefined') {
 				this.targetregex = this.settings.targetregex;
 			}
-			if ( typeof this.settings.target != 'undefined' ) {
+			if (typeof this.settings.target != 'undefined') {
 				this.target = this.settings.target;
 			}
-			if ( typeof this.settings.cssclassregex != 'undefined' ) {
+			if (typeof this.settings.cssclassregex != 'undefined') {
 				this.cssclassregex = this.settings.cssclassregex;
 			}
-			if ( typeof this.settings.cssclass != 'undefined' ) {
+			if (typeof this.settings.cssclass != 'undefined') {
 				this.cssclass = this.settings.cssclass;
 			}
-			if ( typeof this.settings.objectTypeFilter != 'undefined' ) {
+			if (typeof this.settings.objectTypeFilter != 'undefined') {
 				this.objectTypeFilter = this.settings.objectTypeFilter;
 			}
-			if ( typeof this.settings.onHrefChange != 'undefined' ) {
+			if (typeof this.settings.onHrefChange != 'undefined') {
 				this.onHrefChange = this.settings.onHrefChange;
 			}
-			if ( typeof this.settings.hotKey != 'undefined' ) {
+			if (typeof this.settings.hotKey != 'undefined') {
 				jQuery.extend(true, this.hotKey, this.settings.hotKey);
 			}
-			if ( typeof this.settings.hrefValue != 'undefined' ) {
+			if (typeof this.settings.hrefValue != 'undefined') {
 				this.hrefValue = this.settings.hrefValue;
 			}
 			
@@ -259,32 +319,38 @@ define( [
 				plugin.initSidebar(Aloha.Sidebar.right);
 				PubSub.pub('aloha.link.ready', {
 					plugin: plugin
-				})
+				});
 			});
+			
+			LANG_REPOSITORY = new LanguageRepository(
+				'link-languages',
+				this.flags,
+				'iso639-1',
+				Aloha.settings.locale,
+				'language/link'
+			);
 		},
 
 		nsSel: function () {
 			var stringBuilder = [], prefix = pluginNamespace;
-			jQuery.each( arguments, function () {
-				stringBuilder.push( '.' + ( this == '' ? prefix : prefix + '-' + this ) );
-			} );
+			jQuery.each(arguments, function () {
+				stringBuilder.push('.' + (this == '' ? prefix : prefix + '-' + this));
+			});
 			return jQuery.trim(stringBuilder.join(' '));
 		},
 
 		//Creates string with this component's namepsace prefixed the each classname
 		nsClass: function () {
 			var stringBuilder = [], prefix = pluginNamespace;
-			jQuery.each( arguments, function () {
-				stringBuilder.push( this == '' ? prefix : prefix + '-' + this );
-			} );
+			jQuery.each(arguments, function () {
+				stringBuilder.push(this == '' ? prefix : prefix + '-' + this);
+			});
 			return jQuery.trim(stringBuilder.join(' '));
 		},
 
-		initSidebar: function ( sidebar ) {
+		initSidebar: function (sidebar) {
 			var pl = this;
-			pl.sidebar = sidebar;
 			sidebar.addPanel( {
-				
 				id       : pl.nsClass( 'sidebar-panel-target' ),
 				title    : i18n.t( 'floatingmenu.tab.link' ),
 				content  : '',
@@ -292,6 +358,8 @@ define( [
 				activeOn : 'a, link',
 				
 				onInit: function () {
+					initHrefLang(pl, this);
+
 					 var that = this,
 						 content = this.setContent(
 							'<div class="' + pl.nsClass( 'target-container' ) + '"><fieldset><legend>' + i18n.t( 'link.target.legend' ) + '</legend><ul><li><input type="radio" name="targetGroup" class="' + pl.nsClass( 'radioTarget' ) + '" value="_self" /><span>' + i18n.t( 'link.target.self' ) + '</span></li>' + 
@@ -300,8 +368,12 @@ define( [
 							'<li><input type="radio" name="targetGroup" class="' + pl.nsClass( 'radioTarget' ) + '" value="_top" /><span>' + i18n.t( 'link.target.top' ) + '</span></li>' + 
 							'<li><input type="radio" name="targetGroup" class="' + pl.nsClass( 'radioTarget' ) + '" value="framename" /><span>' + i18n.t( 'link.target.framename' ) + '</span></li>' + 
 							'<li><input type="text" class="' + pl.nsClass( 'framename' ) + '" /></li></ul></fieldset></div>' + 
-							'<div class="' + pl.nsClass( 'title-container' ) + '" ><fieldset><legend>' + i18n.t( 'link.title.legend' ) + '</legend><input type="text" class="' + pl.nsClass( 'linkTitle' ) + '" /></fieldset></div>'
+							'<div class="' + pl.nsClass( 'title-container' ) + '" ><fieldset><legend>' + i18n.t( 'link.title.legend' ) + '</legend><input type="text" class="' + pl.nsClass( 'linkTitle' ) + '" /></fieldset></div>' +
+							'<div class="' + pl.nsClass( 'href-lang-container' ) + '" ><fieldset><legend>' + i18n.t( 'href.lang.legend' ) + '</legend></fieldset></div>'
 						).content; 
+					 
+					 jQuery(hrefLangField.getInputElem()).addClass(pl.nsClass( 'hrefLang' ));
+					 jQuery(content).find("." + pl.nsClass( 'href-lang-container' ) + " fieldset").append(hrefLangField.getInputElem());
 					 
 					 jQuery( pl.nsSel( 'framename' ) ).live( 'keyup', function () {
 						jQuery( that.effective ).attr( 'target', jQuery( this ).val().replace( '\"', '&quot;' ).replace( "'", "&#39;" ) );
@@ -311,8 +383,8 @@ define( [
 						if ( jQuery( this ).val() == 'framename' ) {
 							jQuery( pl.nsSel( 'framename' ) ).slideDown();
 						} else {
-							jQuery( pl.nsSel( 'framename' ) ).slideUp().val( '' );
-							jQuery( that.effective ).attr( 'target', jQuery( this ).val() );
+							jQuery(pl.nsSel('framename')).slideUp().val( '' );
+							jQuery(that.effective).attr('target', jQuery( this ).val());
 						}
 					 } );
 					 
@@ -348,6 +420,21 @@ define( [
 					var that = this;
 					that.effective = effective;
 					jQuery( pl.nsSel( 'linkTitle' ) ).val( jQuery( that.effective ).attr( 'title' ) );
+					
+					var hrefLangAttr = jQuery(effective).attr('hreflang');
+					
+					if (hrefLangAttr && hrefLangAttr.length > 0) {
+						var languageName = getLanguageName(hrefLangAttr);
+						hrefLangField.setValue(languageName);
+					} else {
+						hrefLangField.setValue('');
+					}
+					
+					if (EXTERNAL_LINK_REG_EXP.test(jQuery(effective).attr('href'))) {
+						hrefLangField.enableInput();
+					} else {
+						hrefLangField.disableInput();
+					}
 				}
 				
 			} );
@@ -359,36 +446,35 @@ define( [
 		 * Subscribe for events
 		 */
 		subscribeEvents: function () {
-			var that = this,
-			    isEnabled = {};
-
+			var plugin = this;
 			var editablesCreated = 0;
 
-			// add the event handler for creation of editables
-			Aloha.bind('aloha-editable-created', function (event, editable) {
-				var config = that.getEditableConfig(editable.obj),
-				    enabled = (jQuery.inArray('a', config) !== -1);
+			PubSub.sub('aloha.editable.created', function (message) {
+				var editable = message.editable;
+				var config = plugin.getEditableConfig(editable.obj);
+				var enabled = config
+				           && (jQuery.inArray('a', config) > -1)
+				           && ContentRules.isAllowed(editable.obj[0], 'a');
 
-				isEnabled[editable.getId()] = enabled;
+				configurations[editable.getId()] = !!enabled;
 
 				if (!enabled) {
 					return;
 				}
 
 				// enable hotkey for inserting links
-				editable.obj.bind('keydown.aloha-link', that.hotKey.insertLink, function() {
-					if ( that.findLinkMarkup() ) {
-						// open the tab containing the href
-						that.hrefField.foreground();
-						that.hrefField.focus();
+				editable.obj.bind('keydown.aloha-link', plugin.hotKey.insertLink, function () {
+					if (plugin.findLinkMarkup()) {
+						plugin.hrefField.foreground();
+						plugin.hrefField.focus();
 					} else {
-						that.insertLink(true);
+						plugin.insertLink(true);
 					}
 					return false;
-				} );
+				});
 
 				editable.obj.find('a').each(function() {
-					that.addLinkEventHandlers(this);
+					plugin.addLinkEventHandlers(this);
 				});
 
 				if (0 === editablesCreated++) {
@@ -396,57 +482,58 @@ define( [
 				}
 			});
 
-			Aloha.bind('aloha-editable-destroyed', function (event, editable) {
-				editable.obj.unbind('.aloha-link');
+			PubSub.sub('aloha.editable.destroyed', function (message) {
+				message.editable.obj.unbind('.aloha-link');
 				if (0 === --editablesCreated) {
 					teardownMousePointerFix();
 				}
 			});
 
-			Aloha.bind('aloha-editable-activated', function(event, props) {
-				if (isEnabled[Aloha.activeEditable.getId()]) {
-					that._formatLinkButton.show();
-					that._insertLinkButton.show();
+			PubSub.sub('aloha.editable.activated', function (message) {
+				if (configurations[message.editable.getId()]) {
+					plugin._formatLinkButton.show();
+					plugin._insertLinkButton.show();
 				} else {
-					that._formatLinkButton.hide();
-					that._insertLinkButton.hide();
+					plugin._formatLinkButton.hide();
+					plugin._insertLinkButton.hide();
 				}
-				setupMetaClickLink(props.editable);
+				setupMetaClickLink(message.editable);
 			});
 
 			var insideLinkScope = false;
 
-			Aloha.bind('aloha-selection-changed', function(event, rangeObject){
+			PubSub.sub('aloha.selection.context-change', function (message) {
+				if (!Aloha.activeEditable) {
+					return;
+				}
 				var enteredLinkScope = false;
-				if (Aloha.activeEditable && isEnabled[Aloha.activeEditable.getId()]) {
-					enteredLinkScope = selectionChangeHandler(that, rangeObject);
-					// Only foreground the tab containing the href field
-					// the first time the user enters the link scope to
-					// avoid intefering with the user's manual tab
-					// selection.
+				if (configurations[Aloha.activeEditable.getId()]) {
+					enteredLinkScope = selectionChangeHandler(plugin, message.range);
+					// Only foreground the tab containing the href field the
+					// first time the user enters the link scope to avoid
+					// intefering with the user's manual tab selection
 					if (enteredLinkScope && insideLinkScope !== enteredLinkScope) {
-						that.hrefField.foreground();
+						plugin.hrefField.foreground();
 					}
 				}
 				insideLinkScope = enteredLinkScope;
 			});
 
-			// Fixes problem: if one clicks from inside an aloha link
-			// outside the editable and thereby deactivates the
-			// editable, the link scope will remain active.
-			var linkPlugin = this;
-			Aloha.bind('aloha-editable-deactivated', function (event, props) {
+			// Fixes problem: if one clicks from inside an aloha link outside
+			// the editable and thereby deactivates the editable, the link scope
+			// will remain active
+			PubSub.sub('aloha.editable.deactivated', function (message) {
 				if (insideLinkScope) {
-					// Leave the link scope lazily to avoid flickering
-					// when switching between anchor element editables.
+					// Leave the link scope lazily to avoid flickering when
+					// switching between anchor element editables
 					setTimeout(function () {
 						if (!insideLinkScope) {
-							linkPlugin.toggleLinkScope(false);
+							plugin.toggleLinkScope(false);
 						}
 					}, 100);
 					insideLinkScope = false;
 				}
-				teardownMetaClickLink(props.editable);
+				teardownMetaClickLink(message.editable);
 			});
 		},
 
@@ -559,7 +646,7 @@ define( [
 				valueField: 'url',
 				cls: 'aloha-link-href-field',
 				scope: 'Aloha.continuoustext',
-				noTargetHighlight: true,
+				noTargetHighlight: false,
 				targetHighlightClass: 'aloha-focus'
 			});
 			this.hrefField.setTemplate('<span><b>{name}</b><br/>{url}</span>');
@@ -582,6 +669,11 @@ define( [
 		bindInteractions: function () {
 			var that = this;
 
+			this.hrefField.addListener('item-change', function(){
+				// because 'hrefChange()' references 'this' object.
+				that.hrefChange();
+			});
+			
 			// update link object when src changes
 			this.hrefField.addListener( 'keyup', function ( event ) {
 				if (Keys.getToken(event.keyCode) === 'escape') {
@@ -589,7 +681,7 @@ define( [
 					if ( curval[ 0 ] == '/' || // local link
 						 curval[ 0 ] == '#' || // inner document link
 						 curval.match( /^.*\.([a-z]){2,4}$/i ) || // local file with extension
-						 curval.match( /^([a-z]){3,10}:\/\/.+/i ) || // external link (http(s), ftp(s), ssh, file, skype, ... )
+						 curval.match( EXTERNAL_LINK_REG_EXP ) || // external link (http(s), ftp(s), ssh, file, skype, ... )
 						 curval.match( /^(mailto|tel):.+/i ) // mailto / tel link
 					) {
 						// could be a link better leave it as it is
@@ -623,15 +715,12 @@ define( [
 					// The first one we need to ignore is the one trigger when
 					// we reposition the selection to right at the end of the
 					// link.
-					// Not sure what the next event is yet but we need to
-					// ignore it as well, ignoring it prevents the value of
-					// hrefField from being set to the old value.
+
 					that.ignoreNextSelectionChangedEvent = true;
 					range.startContainer = range.endContainer;
 					range.startOffset = range.endOffset;
 					range.select();
-					that.ignoreNextSelectionChangedEvent = true;
-					
+
 					var hrefValue = jQuery( that.hrefField.getInputElem() ).attr( 'value' );
 					
 					if ( hrefValue == that.hrefValue || hrefValue == '' ) {
@@ -684,7 +773,7 @@ define( [
 
 		/**
 		 * Check whether inside a link tag
-		 * @param {GENTICS.Utils.RangeObject} range range where to insert the
+		 * @param {RangeObject} range range where to insert the
 		 *			object (at start or end)
 		 * @return markup
 		 * @hide
@@ -749,20 +838,20 @@ define( [
 			
 			// if selection is collapsed then extend to the word.
 			if ( range.isCollapsed() && extendToWord !== false ) {
-				GENTICS.Utils.Dom.extendToWord( range );
+				Dom.extendToWord( range );
 			}
 			if ( range.isCollapsed() ) {
 				// insert a link with text here
 				linkText = i18n.t( 'newlink.defaulttext' );
 				newLink = jQuery( '<a href="' + that.hrefValue + '" class="aloha-new-link">' + linkText + '</a>' );
-				GENTICS.Utils.Dom.insertIntoDOM( newLink, range, jQuery( Aloha.activeEditable.obj ) );
+				Dom.insertIntoDOM( newLink, range, jQuery( Aloha.activeEditable.obj ) );
 				range.startContainer = range.endContainer = newLink.contents().get( 0 );
 				range.startOffset = 0;
 				range.endOffset = linkText.length;
 			} else {
 				newLink = jQuery( '<a href="' + that.hrefValue + '" class="aloha-new-link"></a>' );
-				GENTICS.Utils.Dom.addMarkup( range, newLink, false );
-				GENTICS.Utils.Dom.doCleanup(insertLinkPostCleanup, range);
+				Dom.addMarkup( range, newLink, false );
+				Dom.doCleanup(insertLinkPostCleanup, range);
 			}
 
 			Aloha.activeEditable.obj.find( 'a.aloha-new-link' ).each( function ( i ) {
@@ -798,12 +887,14 @@ define( [
 		removeLink: function ( terminateLinkScope ) {
 			var	range = Aloha.Selection.getRangeObject(),
 				foundMarkup = this.findLinkMarkup();
-			
+			var linkText;
+
 			// clear the current item from the href field
 			this.hrefField.setItem(null);
 			if ( foundMarkup ) {
+				linkText = jQuery(foundMarkup).text();
 				// remove the link
-				GENTICS.Utils.Dom.removeFromDOM( foundMarkup, range, true );
+				Dom.removeFromDOM( foundMarkup, range, true );
 
 				range.startContainer = range.endContainer;
 				range.startOffset = range.endOffset;
@@ -815,6 +906,16 @@ define( [
 						terminateLinkScope === true ) {
 					Scopes.setScope('Aloha.continuoustext');
 				}
+
+				// trigger an event for removing the link
+				var apiRange = Aloha.createRange();
+				apiRange.setStart(range.startContainer, range.startOffset);
+				apiRange.setEnd(range.endContainer, range.endOffset);
+
+				PubSub.pub('aloha.link.remove', {
+					range: apiRange,
+					text: linkText
+				});
 			}
 		},
 
@@ -895,9 +996,51 @@ define( [
 					this.hrefField.getItem()
 				);
 			}
+			
+			var hrefFieldItem = this.hrefField.getItem();
+			// If href has been set to an item (Page)
+			if (hrefFieldItem && hrefFieldItem.language) {
+				var languageName = getLanguageName(hrefFieldItem.language);
+				
+				this.hrefField.setAttribute('hreflang', hrefFieldItem.language);
+				hrefLangField.setValue(languageName);
+				hrefLangField.disableInput();
+			}
+			// href is an external link
+			else if (EXTERNAL_LINK_REG_EXP.test(href)){
+				hrefLangField.enableInput();
+			}
+			// href is being defined
+			else {
+				hrefLangField.setValue('');
+				this.hrefField.setAttribute('hreflang', '');
+				hrefLangField.disableInput();
+			}
 		}
 	});
 
+	/**
+	 * Add additional target objects, in case the selection includes
+	 * several links tag
+	 *
+	 * @param {RangeObject} rangeObject Selection Range
+	 * @param {LinkPlugin} that Link Plugin object
+	 */
+	function addAdditionalTargetObject(rangeObject, field) {
+		var links = rangeObject.findAllMarkupByTagName('A', rangeObject);
+		for (var i = 0, len = links.length; i < len; i++) {
+			field.addAdditionalTargetObject(links[i]);
+		}
+	}
+
+	/**
+	 * Selection change handler.
+	 *
+	 * @param {LinkPlugin} that This Link Plugin object
+	 * @param {RangeObject} rangeObject Selection Range
+	 * @returns {boolean} True if the link Scope was activated,
+	 *                    False otherwise
+	 */
 	function selectionChangeHandler(that, rangeObject) {
 		var foundMarkup,
 		    enteredLinkScope = false;
@@ -905,18 +1048,18 @@ define( [
 		// Check if we need to ignore this selection changed event for
 		// now and check whether the selection was placed within a
 		// editable area.
-		if (   !that.ignoreNextSelectionChangedEvent
-			&& Aloha.Selection.isSelectionEditable()
-			&& Aloha.activeEditable != null ) {
+		if (!that.ignoreNextSelectionChangedEvent &&
+			Aloha.Selection.isSelectionEditable() &&
+			Aloha.activeEditable != null ) {
 			
 			foundMarkup = that.findLinkMarkup(rangeObject);
-			
+
 			if (foundMarkup) {
 				that.toggleLinkScope(true);
 
 				// now we are ready to set the target object
 				that.hrefField.setTargetObject(foundMarkup, 'href');
-
+				addAdditionalTargetObject(rangeObject, that.hrefField);
 				// if the selection-changed event was raised by the first click interaction on this page
 				// the hrefField component might not be initialized. When the user switches to the link
 				// tab to edit the link the field would be empty. We check for that situation and add a

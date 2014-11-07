@@ -90,10 +90,10 @@ define([
 		$('body').click(function ($event) {
 			// Because click events on the overlay ui should not cause it to
 			// hide itself.
-			if (!overlay._overlayActive
-					|| ($event.target === overlay.$element[0])
-					|| $($event.target).is('.aloha-icon-characterpicker')
-					|| $($event.target).find('.aloha-icon-characterpicker').length) {
+			if (!overlay._overlayActive ||
+					($event.target === overlay.$element[0]) ||
+					$($event.target).is('.aloha-icon-characterpicker') ||
+					$($event.target).find('.aloha-icon-characterpicker').length) {
 				return;
 			}
 			overlay.hide();
@@ -134,8 +134,8 @@ define([
 
 		if (source.currentStyle) {
 			style = source.currentStyle[camelize(styleProp)];
-		} else if (document.defaultView
-		        && document.defaultView.getComputedStyle) {
+		} else if (document.defaultView &&
+			document.defaultView.getComputedStyle) {
 			style = document.defaultView
 			                .getComputedStyle(source, null)
 			                .getPropertyValue(styleProp);
@@ -253,17 +253,53 @@ define([
 	}
 
 	/**
+	 * Returns the height of the scrollbar.
+	 *
+	 * @private
+	 * @return {number}
+	 */
+	function getScrollBarHeight() {
+		var $outer = $('<div>').css({visibility: 'hidden', height: 100, overflow: 'scroll'}).appendTo('body');
+		var heightWithScroll = $('<div>').css({height: '100%'}).appendTo($outer).outerHeight();
+		$outer.remove();
+		return 100 - heightWithScroll;
+	}
+
+	/**
+	 * The user-agent's scroll bar height.
+	 *
+	 * @private
+	 * @const
+	 * @type {number}
+	 */
+	var SCROLL_BAR_HEIGHT = getScrollBarHeight();
+
+	/**
 	 * Calculates the offset at which to position the overlay element.
 	 *
 	 * @param {jQuery.<HTMLElement>} $element A DOM element around which to
 	 *                                        calculate the offset.
+	 * @param {jQuery <HTMLElement>} $overlay The overlay element
 	 */
-	function calculateOffset($element) {
+	function calculateOffset($element, $overlay) {
 		var offset = $element.offset();
 		if ('fixed' === Floating.POSITION_STYLE) {
 			offset.top -= $WINDOW.scrollTop();
 			offset.left -= $WINDOW.scrollLeft();
 		}
+
+		//adjust position if overlay element is overlapping window borders
+		var maxWidth = $WINDOW.width();
+		var maxHeight = $WINDOW.height() - SCROLL_BAR_HEIGHT;
+
+		if (maxWidth < offset.left + $overlay.width()) {
+			offset.left = maxWidth - $overlay.width();
+		}
+
+		if (maxHeight < offset.top + $overlay.height()) {
+			offset.top = maxHeight - $overlay.height();
+		}
+
 		return offset;
 	}
 
@@ -328,7 +364,7 @@ define([
 
 			// Because the overlay needs to be reposition relative its button.
 			overlay.$element
-			       .css(calculateOffset($insert))
+			       .css(calculateOffset($insert, overlay.$element))
 			       .css('position', Floating.POSITION_STYLE)
 			       .show()
 			       .find('.focused')
@@ -394,10 +430,9 @@ define([
 		init: function () {
 			var characterpicker = this;
 
-			if (Aloha.settings.plugins
-					&& Aloha.settings.plugins.characterpicker) {
-				characterpicker.settings
-						= Aloha.settings.plugins.characterpicker;
+			if (Aloha.settings.plugins &&
+				Aloha.settings.plugins.characterpicker) {
+				characterpicker.settings = Aloha.settings.plugins.characterpicker;
 			}
 
 			var button = Ui.adopt('characterPicker', Button, {
@@ -430,14 +465,14 @@ define([
 				if (editableIndex < Aloha.editables.length) {
 					generateOverlay(characterpicker,
 							Aloha.editables[editableIndex]);
-					setTimeout(function () {
+					window.setTimeout(function () {
 						pregenerateOverlays(editableIndex + 1);
 					}, 100);
 				}
 			}
 
 			// FIXME: ... but why?
-			setTimeout(function () {
+			window.setTimeout(function () {
 				pregenerateOverlays(0);
 			}, 100);
 
@@ -454,7 +489,7 @@ define([
 			PubSub.sub('aloha.floating.changed', function (message) {
 				if (characterpicker.overlay) {
 					characterpicker.overlay.$element.css(
-						calculateOffset(button.element)
+						calculateOffset(button.element, characterpicker.overlay.$element)
 					);
 				}
 			});

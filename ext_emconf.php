@@ -15,13 +15,13 @@ $EM_CONF[$_EXTKEY] = array (
 	'description' => 'Awesome inline frontend editing with Aloha',
 	'category' => 'fe',
 	'shy' => 0,
-	'version' => '0.2.0',
+	'version' => '0.2.1',
 	'dependencies' => '',
 	'conflicts' => '',
 	'priority' => '',
 	'loadOrder' => '',
 	'module' => '',
-	'state' => 'beta',
+	'state' => 'excludeFromUpdates',
 	'uploadfolder' => 0,
 	'createDirs' => '',
 	'modify_tables' => '',
@@ -32,17 +32,17 @@ $EM_CONF[$_EXTKEY] = array (
 	'author_company' => 'CYBERHOUSE, Pixelant',
 	'CGLcompliance' => NULL,
 	'CGLcompliance_note' => NULL,
-	'constraints' => 
+	'constraints' =>
 	array (
-		'depends' => 
+		'depends' =>
 		array (
 			'typo3' => '6.0.0-6.2.99',
 			'' => '',
 		),
-		'conflicts' => 
+		'conflicts' =>
 		array (
 		),
-		'suggests' => 
+		'suggests' =>
 		array (
 		),
 	),

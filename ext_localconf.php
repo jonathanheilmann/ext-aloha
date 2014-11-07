@@ -34,4 +34,9 @@ $GLOBALS['TYPO3_CONF_VARS']['Aloha']['Classes/Save/Save.php']['requestPreProcess
 $GLOBALS['TYPO3_CONF_VARS']['Aloha']['Classes/Save/Save.php']['requestPreProcess'][$_EXTKEY . '-cobjtable'] =
 	'EXT:aloha/Classes/Hooks/RequestPreProcess/CeTable.php:&Tx_Aloha_Hooks_RequestPreProcess_CeTable';
 
+
+	// Save datetime
+$GLOBALS['TYPO3_CONF_VARS']['Aloha']['Classes/Save/Save.php']['requestPreProcess'][$_EXTKEY . '-datetime'] =
+	'EXT:aloha/Classes/Hooks/RequestPreProcess/CeTable.php:&Tx_Aloha_Hooks_RequestPreProcess_Datetime';
+
 ?>

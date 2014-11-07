@@ -293,7 +293,7 @@ window.alohaQuery("#aloha-saveButton").show();
 		}
 
 		// in case we changed header
-		if ($this->table == 'tt_content' && $this->field == 'header' && substr( $request['content'], 0, 2 ) === "<h")
+		if ($this->table == 'tt_content' && $this->field == 'header')// && substr( $request['content'], 0, 2 ) === "<h")
 		{
 			$request['content'] = $this->processHeader($request);
 		}
@@ -413,8 +413,10 @@ window.alohaQuery("#aloha-saveButton").show();
 	}
 
 	private function processHeader($request) {
-		$content = urldecode(strip_tags($request['content']));
-		switch (substr( $request['content'], 0, 4 ))
+		$originRequest = $request;
+		$content = urldecode(strip_tags($originRequest['content']));
+		// process header layout
+		switch (substr( $originRequest['content'], 0, 4 ))
 		{
 			case '<h1>':
 				$request['content'] = 1;
@@ -434,6 +436,16 @@ window.alohaQuery("#aloha-saveButton").show();
 		}
 		$request['identifier'] = $this->table . '--header_layout--' . $this->uid;
 		$this->directSave($request,TRUE);
+
+		// process header link
+		$rteHtmlParser = \TYPO3\CMS\Core\Utility\GeneralUtility::makeInstance('\TYPO3\CMS\Core\Html\RteHtmlParser');
+		$parsedHtml = $rteHtmlParser->TS_links_db($originRequest['content']);
+		preg_match("/(?<=<link )[^>]*/", $parsedHtml, $header_link);
+		$request['content'] = (isset($header_link[0]) ? $header_link[0] : '');
+		$request['identifier'] = $this->table . '--header_link--' . $this->uid;
+		$this->directSave($request,TRUE);
+
+		// reset field
 		$this->field = 'header';
 
 		return $content;

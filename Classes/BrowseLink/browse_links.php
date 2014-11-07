@@ -32,7 +32,7 @@ require_once \TYPO3\CMS\Core\Utility\ExtensionManagementUtility::extPath('record
 
 class BrowseLinks extends \TYPO3\CMS\Recordlist\Controller\ElementBrowserController {
 	/**
-	 * 
+	 *
 	 *
 	 * @var string
 	 */
@@ -116,7 +116,14 @@ $this->printContent();
 			});
 			self.close();
 		}
-	</script></body>';
+	</script>
+	<script type="text/javascript">
+		function renderPopup_unLink() {
+			window.opener.Aloha.trigger("aloha-typolink-removed", "FALSE" );
+			self.close();
+		}
+	</script>
+	</body>';
 	$pos = strripos($this->content, $needle);
 	$this->content = substr_replace($this->content,$replace,$pos,strlen($needle));
 	}

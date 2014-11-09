@@ -25,6 +25,9 @@
 .button_link {
 	background: url(../resources/button_link.gif) no-repeat center center !important;
 }
+.button_unlink {
+	background: url(../resources/button_unlink.gif) no-repeat center center !important;
+}
 .hide {
 	display: none !important;
 }

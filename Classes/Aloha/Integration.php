@@ -96,6 +96,13 @@ class Tx_Aloha_Aloha_Integration {
 		if ($this->checkAccess($allowedActions, 'link')) {
 			array_push($classList, 'action-link');
 		}
+
+			// unlink action
+		if ($this->checkAccess($allowedActions, 'unlink')) {
+			array_push($classList, 'action-unlink');
+		}
+
+			// hide and unhide action
 		if (isset($GLOBALS['TCA'][$this->table]['ctrl']['enablecolumns']['disabled'])) {
 			$disabledField = $GLOBALS['TCA'][$this->table]['ctrl']['enablecolumns']['disabled'];
 			if ($this->checkAccess($allowedActions, 'hide') && $this->dataArray[$disabledField] == 0) {

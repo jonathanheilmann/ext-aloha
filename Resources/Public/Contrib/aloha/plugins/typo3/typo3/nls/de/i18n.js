@@ -8,6 +8,7 @@ define({
 		"button.unhide":"Anzeigen",
 		"button.delete":"L\u00f6schen",
 		"button.link":"Link",
+		"button.unlink":"Link entfernen",
 		"button.newContentElementBelow":"Neues Inhaltselement unter diesem einf\u00fcgen",
 		"confirm.hide":"M\u00f6chten Sie wirklich dieses Element verbergen?",
 		"confirm.unhide":"M\u00f6chten Sie wirklich dieses Element anzeigen?",

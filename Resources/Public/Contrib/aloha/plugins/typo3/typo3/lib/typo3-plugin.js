@@ -46,7 +46,7 @@ function(
 			var that = this;
 
 			this.buttons = {};
-			var buttons = [ 'up', 'down', 'edit', 'hide', 'unhide', 'newContentElementBelow', 'move','link','delete'];
+			var buttons = [ 'up', 'down', 'edit', 'hide', 'unhide', 'newContentElementBelow', 'move', 'link', 'unlink', 'delete'];
 
 			jQuery.each(buttons, function(j, button) {
 				var askUserForAction = false;
@@ -83,6 +83,9 @@ function(
 							that.openLightbox(url);
 						} else if(button == 'link') {
 							that.newTypolink();
+						} else if(button == 'unlink') {
+							that.removeTypolink();
+							that.saveEditable(Aloha.getActiveEditable().obj[0]);
 						} else {
 							if (askUserForAction && (confirm(i18n.t('confirm.' + button))) || (!askUserForAction)) {
 								that.ajaxRequest(button);
@@ -252,7 +255,7 @@ function(
 			var that = this;
 			Aloha.bind(
 				'aloha-editable-activated', function (jEvent, params) {
-					that.disableSaveButton();
+					//that.disableSaveButton();
 
 					jQuery.each(that.buttons, function(index, button) {
 						if (jQuery(params.editable.obj).hasClass('action-' + index)) {

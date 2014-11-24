@@ -414,20 +414,23 @@ window.alohaQuery("#aloha-saveButton").show();
 
 	private function processHeader($request) {
 		$originRequest = $request;
-		$content = urldecode(strip_tags($originRequest['content']));
+		$header = '';
+		$dom = new \DOMDocument();
+		$dom->loadHTML($originRequest['content']);
+
 		// process header layout
-		switch (substr( $originRequest['content'], 0, 4 ))
+		switch (substr( $originRequest['content'], 0, 3 ))
 		{
-			case '<h1>':
+			case '<h1':
 				$request['content'] = 1;
 				break;
-			case '<h2>':
+			case '<h2':
 				$request['content'] = 2;
 				break;
-			case '<h3>':
+			case '<h3':
 				$request['content'] = 3;
 				break;
-			case '<h4>':
+			case '<h4':
 				$request['content'] = 4;
 				break;
 			default:
@@ -435,6 +438,27 @@ window.alohaQuery("#aloha-saveButton").show();
 				break;
 		}
 		$request['identifier'] = $this->table . '--header_layout--' . $this->uid;
+		$this->directSave($request,TRUE);
+
+		// process header position
+		$items = $dom->getElementsByTagName('*');
+		foreach($items as $key => $item) {
+			$style = $item->getAttribute('style');
+			if (stristr($style, 'text-align: left;')) {
+				// left
+				$position = 'left';
+			}
+			if (stristr($style, 'text-align: center;')) {
+				// center
+				$position = 'center';
+			}
+			if (stristr($style, 'text-align: right;')) {
+				// right
+				$position = 'right';
+			}
+		}
+		$request['content'] = (!empty($position) ? $position : '');
+		$request['identifier'] = $this->table . '--header_position--' . $this->uid;
 		$this->directSave($request,TRUE);
 
 		// process header link
@@ -445,9 +469,28 @@ window.alohaQuery("#aloha-saveButton").show();
 		$request['identifier'] = $this->table . '--header_link--' . $this->uid;
 		$this->directSave($request,TRUE);
 
+		// process subheader for bootstrap_package
+		/*$items = $dom->getElementsByTagName('small');
+		if ($items->length > 0) {
+			$subheader = $items->item($items->length - 1)->nodeValue;
+			if (!empty($subheader)) {
+				$request['content'] = $subheader;
+				$request['identifier'] = $this->table . '--header_subheader--' . $this->uid;
+				$this->directSave($request,TRUE);
+				// get "main" header
+				$header = $items->item($items->length - 1);
+				$dom->removeChild($header);
+				$header = $dom->saveHTML();
+				\TYPO3\CMS\Extbase\Utility\DebuggerUtility::var_dump($header->previousSibling);
+				$header = '';
+			}
+		}*/
+
 		// reset field
 		$this->field = 'header';
 
+		// return header
+		$content = (!empty($header) ? $header : urldecode(strip_tags($originRequest['content'])));
 		return $content;
 	}
 }

@@ -4,7 +4,7 @@ window.Aloha.ready( function() {
 	window.alohaQuery = $;
 
 	$('.alohaeditable').aloha();
-	$('#aloha-not-loaded').hide();	
+	$('#aloha-not-loaded').hide();
 	$('#aloha-top-bar').show();
 
 	$('#aloha-discardButton').click(function() {
@@ -32,6 +32,8 @@ window.Aloha.ready( function() {
 		});
 	});
 	$('#aloha-saveButton').click(function() {
+		var button = $(this);
+		var buttonText = $(this).html();
 		$.ajax({
 			url: alohaUrl,
 			data: ({
@@ -40,7 +42,11 @@ window.Aloha.ready( function() {
 			cache: false,
 			dataType : 'html',
 			type: 'POST',
+			beforeSend: function(xhr, settings) {
+				$(button).html('<span class="saving-spinner">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span>');
+			},
 			success: function(xhr){
+				$(button).html(buttonText);
 				$().el7r_notify({
 					'text':xhr,
 					'skin':'silver'
@@ -48,6 +54,7 @@ window.Aloha.ready( function() {
 				that.changeSaveButton();
 			},
 			error: function(xhr){
+				$(button).html(buttonText);
 				$().el7r_notify({
 					'text':xhr.responseText,
 					'skin':'darkred'

@@ -225,6 +225,11 @@ body {
 
 #aloha-topbar-inner .save {
 }
+#aloha-topbar-inner .save .saving-spinner{
+	background-image: url('../Images/savingSpinner.gif');
+	background-repeat: no-repeat;
+	background-position: center center;
+}
 
 #aloha-topbar-inner .tobesaved {
 	font-weight:bold;
@@ -502,7 +507,7 @@ body {
 
 #aloha-topbar-inner a i:hover {
 	color: #626262;
-	-webkit-transition: color 0.1s linear;  
+	-webkit-transition: color 0.1s linear;
     -moz-transition: color 0.1s linear;
     -o-transition: color 0.1s linear;
     transition: color 0.1s linear;
@@ -520,7 +525,7 @@ body {
 #aloha-topbar-inner a.btn-success:hover {
 	background-color: #51a351;
 	color: #fff;
-	-webkit-transition: background-color 0.1s linear;  
+	-webkit-transition: background-color 0.1s linear;
     -moz-transition: background-color 0.1s linear;
     -o-transition: background-color 0.1s linear;
     transition: background-color 0.1s linear;

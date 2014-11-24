@@ -882,7 +882,6 @@ define(['jquery', 'util/class', 'aloha/ecma5shims'], function (jQuery, Class, $_
 				} catch (e) {
 					return;
 				}
-
 				// decide further actions by node type
 				switch (nodeType) {
 				// found a non-text node

@@ -470,21 +470,17 @@ window.alohaQuery("#aloha-saveButton").show();
 		$this->directSave($request,TRUE);
 
 		// process subheader for bootstrap_package
-		/*$items = $dom->getElementsByTagName('small');
-		if ($items->length > 0) {
-			$subheader = $items->item($items->length - 1)->nodeValue;
-			if (!empty($subheader)) {
-				$request['content'] = $subheader;
-				$request['identifier'] = $this->table . '--header_subheader--' . $this->uid;
-				$this->directSave($request,TRUE);
-				// get "main" header
-				$header = $items->item($items->length - 1);
-				$dom->removeChild($header);
-				$header = $dom->saveHTML();
-				\TYPO3\CMS\Extbase\Utility\DebuggerUtility::var_dump($header->previousSibling);
-				$header = '';
-			}
-		}*/
+		preg_match("/<small.*>.*<\/small>/i", $originRequest['content'], $subheaderArray);
+		\TYPO3\CMS\Core\Utility\DebugUtility::debug($subheaderArray);
+		if (count($subheaderArray == 1)) {
+			// get subheader
+			$request['content'] = urldecode(trim(strip_tags($subheaderArray[0])));
+			$request['identifier'] = $this->table . '--subheader--' . $this->uid;
+			\TYPO3\CMS\Core\Utility\DebugUtility::debug($request);
+			$this->directSave($request,TRUE);
+			// get "main" header
+			$header = urldecode(trim(strip_tags(str_replace($subheaderArray[0], '', $originRequest['content']))));
+		}
 
 		// reset field
 		$this->field = 'header';

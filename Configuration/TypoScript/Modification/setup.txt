@@ -29,6 +29,27 @@ config.tx_aloha {
 	config.tx_aloha.topBar.disable = 1
 [global]
 
+[globalString = TYPO3_LOADED_EXT|bootstrap_package|type=/(.+)/]
+# begin for bootstrap_package
+
+# Remove header link
+# lib.stdheader.10.setCurrent.typolink >
+
+#header
+lib.stdheader.10.stdWrap.stdWrapProcess = Tx_Aloha_hooks_editicons->render
+lib.stdheader.10.stdWrap.alohaProcess = 1
+lib.stdheader.10.stdWrap.alohaProcess {
+	tag = div
+	field = header
+	allow = move, edit, hide, unhide, newContentElementBelow, delete, link, unlink
+	class = heading nostyles
+}
+
+# remove edit Icons from feedit
+lib.stdheader.stdWrap.editIcons >
+
+#end for bootstrap_package
+[ELSE]
 # Remove header link
 lib.stdheader.10.setCurrent.typolink >
 
@@ -38,7 +59,7 @@ lib.stdheader.10.1.alohaProcess = 1
 lib.stdheader.10.1.alohaProcess {
 	tag = div
 	field = header
-	allow = edit
+	allow = move, edit, hide, unhide, newContentElementBelow, delete, link, unlink
 	class = heading nostyles
 }
 lib.stdheader.10.2.stdWrapProcess < lib.stdheader.10.1.stdWrapProcess
@@ -52,8 +73,8 @@ lib.stdheader.10.5.alohaProcess < lib.stdheader.10.1.alohaProcess
 
 lib.stdheader.default.stdWrap.editIcons.beforeLastTag = -1
 
-
 lib.stdheader.default.10.2.aloha < lib.stdheader.default.10.1.aloha
+[GLOBAL]
 
 
 tt_content.text.20.editIcons.beforeLastTag = 0
@@ -81,4 +102,14 @@ tt_content.table.20.stdWrap.alohaPostProcess {
 	class = alohaeditable-block
 	field = bodytext
 	allow = all
+}
+
+# CType list
+tt_content.list.20.stdWrap.editIcons >
+tt_content.list.20.stdWrap.alohaPostProcess = 1
+tt_content.list.20.stdWrap.alohaPostProcess {
+	class = alohaeditable-block
+	field = bodytext
+	allow = move, edit, hide, unhide, newContentElementBelow, delete
+	class = nostyles
 }

@@ -1,9 +1,9 @@
 /* sanitizecontenthandler.js is part of Aloha Editor project http://aloha-editor.org
  *
- * Aloha Editor is a WYSIWYG HTML5 inline editing library and editor.
+ * Aloha Editor is a WYSIWYG HTML5 inline editing library and editor. 
  * Copyright (c) 2010-2012 Gentics Software GmbH, Vienna, Austria.
- * Contributors http://aloha-editor.org/contribution.php
- *
+ * Contributors http://aloha-editor.org/contribution.php 
+ * 
  * Aloha Editor is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License
  * as published by the Free Software Foundation; either version 2
@@ -17,7 +17,7 @@
  * You should have received a copy of the GNU General Public License
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
- *
+ * 
  * As an additional permission to the GNU GPL version 2, you may distribute
  * non-source (e.g., minimized or compacted) forms of the Aloha-Editor
  * source code without the copy of the GNU GPL normally required,
@@ -29,15 +29,14 @@ define([
 	'jquery',
 	'aloha/contenthandlermanager',
 	'aloha/plugin',
-	//'aloha/console',
+	'aloha/console',
 	'vendor/sanitize'
 ],
-//function ( Aloha, jQuery, ContentHandlerManager, Plugin, console ) {
-function ( Aloha, jQuery, ContentHandlerManager, Plugin ) {
+function ( Aloha, jQuery, ContentHandlerManager, Plugin, console ) {
 	"use strict";
-
+	
 	var sanitize;
-
+	
 	// predefined set of sanitize options if no dynamic or custom config is used
 	if( !Aloha.defaults.sanitize ) {
 		Aloha.defaults.sanitize = {};
@@ -112,7 +111,7 @@ function ( Aloha, jQuery, ContentHandlerManager, Plugin ) {
 	};
 
 	function initSanitize (configAllows) {
-		var
+		var 
 			filter = [ 'restricted', 'basic', 'relaxed' ],
 			config = Aloha.defaults.supports; // @TODO: needs to be implemented into all plugins
 
